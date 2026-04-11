@@ -4,9 +4,10 @@ use dotenvy::dotenv;
 use html2text::from_read;
 use reqwest::{self};
 use rss::Channel;
+use serde::de::IgnoredAny;
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
-use std::{env, error::Error, ops::Deref};
+use std::{env, error::Error};
 use tabled::Tabled;
 use tokio::time::{Duration, sleep};
 
@@ -48,7 +49,15 @@ struct ChannelRow {
 struct TelegramMessage {
     chat_id: String,
     text: String,
-    parse_mode: String,
+    //parse_mode: String,
+}
+
+#[derive(Deserialize)]
+struct TelegramResponse {
+    ok: bool,
+    result: Option<IgnoredAny>,
+    description: Option<String>,
+    error_code: Option<i64>,
 }
 // To show the types I just need to control + option
 #[tokio::main]
@@ -58,76 +67,99 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let client = reqwest::Client::new();
 
     loop {
-        let news: Vec<ChannelRow> = get_rss_news().await?;
-        let news_sent_to_telegram: Vec<String> = send_via_telegram(&client, news).await?;
+        let news: Vec<ChannelRow> = get_rss_news(&client).await?;
+        let news_sent_to_telegram: Vec<TelegramResponse> = send_via_telegram(&client, news).await?;
 
-        println!(
-            "Did we send it all successfully? {:?}",
-            news_sent_to_telegram.iter().all(|item| item.contains("ok"))
-        );
+        if news_sent_to_telegram.is_empty() {
+            println!("No fresh news found today.");
+        } else {
+            for response in news_sent_to_telegram.iter().filter(|response| !response.ok) {
+                println!(
+                    "Telegram API error: code={:?}, description={:?}, result_present={}",
+                    response.error_code,
+                    response.description,
+                    response.result.is_some()
+                );
+            }
+
+            println!(
+                "Did we send it all successfully? {:?}",
+                news_sent_to_telegram.iter().all(|response| response.ok)
+            );
+        }
 
         sleep(Duration::from_hours(3)).await;
     }
 }
 
-async fn get_rss_news() -> Result<Vec<ChannelRow>, Box<dyn Error>> {
+async fn get_rss_news(client: &reqwest::Client) -> Result<Vec<ChannelRow>, Box<dyn Error>> {
     let rss_providers: [&str; 2] = [
         "https://bitcoinmagazine.com/feed",
         "https://cointelegraph.com/feed",
     ];
 
-    let fetched_news = try_join_all(rss_providers.into_iter().map(fetch_news_from_web)).await?;
+    let fetched_news = try_join_all(
+        rss_providers
+            .into_iter()
+            .map(|rss_provider| fetch_news_from_web(client, rss_provider)),
+    )
+    .await?;
+
     let mut news: Vec<ChannelRow> = fetched_news.into_iter().flatten().collect();
 
-    news.sort_by_key(|f: &ChannelRow| f.pub_date.clone());
+    news.sort_by_key(|f| DateTime::parse_from_rfc2822(&f.pub_date).ok());
 
     Ok(news)
 }
 
-async fn fetch_news_from_web(rss_provider: &str) -> Result<Vec<ChannelRow>, Box<dyn Error>> {
-    let req = reqwest::get(rss_provider).await?.bytes().await?;
+async fn fetch_news_from_web(
+    client: &reqwest::Client,
+    rss_provider: &str,
+) -> Result<Vec<ChannelRow>, Box<dyn Error>> {
+    // Get the XML RSS format from the feed on web
+    let req = client.get(rss_provider).send().await?.bytes().await?;
 
+    // Convert to RSS format Channel
     let channel: Channel = Channel::read_from(&req[..])?;
 
+    // Today
+    let today = Local::now().format("%Y-%m-%d").to_string();
+
+    // Filter by today's news
     let dates: Vec<ChannelRow> = channel
         .items()
-        .into_iter()
-        .filter(|f| {
-            f.pub_date.clone().is_some_and(|date| {
-                let pub_date: &str = date.deref();
+        .iter()
+        .filter_map(|item| {
+            // The filter map returns None or Some, per item
+            let pub_date_str = item.pub_date.as_deref()?;
+            let parsed = DateTime::parse_from_rfc2822(pub_date_str).ok()?;
+            let date_str = parsed.with_timezone(&Local).format("%Y-%m-%d").to_string();
+            if date_str != today {
+                return None;
+            }
 
-                let parsed_date: String = DateTime::parse_from_rfc2822(pub_date)
-                    .ok()
-                    .map(|dt| dt.with_timezone(&Local).format("%Y-%m-%d").to_string())
-                    .unwrap();
-
-                let now: String = Local::now().format("%Y-%m-%d").to_string();
-
-                return parsed_date == now;
+            Some(ChannelRow {
+                title: item.title.clone().unwrap_or_default(),
+                link: item.link.clone().unwrap_or_default(),
+                description: item.description.clone().unwrap_or_default(),
+                pub_date: item.pub_date.clone().unwrap_or_default(),
             })
         })
-        .map(|item| ChannelRow {
-            title: item.title.clone().unwrap(),
-            link: item.link.clone().unwrap(),
-            description: item.description.clone().unwrap(),
-            pub_date: item.pub_date.clone().unwrap(),
-        })
         .collect();
+
     Ok(dates)
 }
 
 async fn send_via_telegram(
     client: &reqwest::Client,
     news: Vec<ChannelRow>,
-) -> Result<Vec<String>, Box<dyn Error>> {
-    let mut responses: Vec<String> = vec![];
+) -> Result<Vec<TelegramResponse>, Box<dyn Error>> {
+    let mut responses: Vec<TelegramResponse> = vec![];
 
-    if news.is_empty() {
-        responses.push("No fresh news found today.".to_string());
-    } else {
+    if !news.is_empty() {
         let n = news
             .iter()
-            .map(async move |item| -> Result<String, Box<dyn Error>> {
+            .map(async move |item| -> Result<TelegramResponse, Box<dyn Error>> {
                 let clean_html = ammonia::clean(&item.description);
                 let parsed_html_to_text = from_read(clean_html.as_bytes(), 100).unwrap();
                 let formatted_news = format!("{}", parsed_html_to_text);
@@ -135,7 +167,7 @@ async fn send_via_telegram(
                 let telegram_message = TelegramMessage {
                     chat_id: CONFIG.telegram_chat_id.clone(),
                     text: formatted_news,
-                    parse_mode: "HTML".to_string(),
+                    //parse_mode: "HTML".to_string(),
                 };
 
                 let post = client
@@ -144,14 +176,14 @@ async fn send_via_telegram(
                     .send()
                     .await?;
 
-                let post_response_text = post.text().await?;
+                let post_response: TelegramResponse = post.json().await?;
 
-                Ok(post_response_text)
+                Ok(post_response)
             });
 
-        let v: Vec<String> = try_join_all(n).await?;
+        let v: Vec<TelegramResponse> = try_join_all(n).await?;
         responses.extend(v);
-    };
+    }
 
     Ok(responses)
 }
