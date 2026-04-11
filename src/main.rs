@@ -1,5 +1,5 @@
 use ::futures::future::try_join_all;
-use chrono::{self, DateTime, Days, Utc};
+use chrono::{self, DateTime, Local};
 use dotenvy::dotenv;
 use html2text::from_read;
 use reqwest::{self};
@@ -57,14 +57,10 @@ async fn get_rss_news() -> Result<(), Box<dyn Error>> {
 
                         let parsed_date: String = DateTime::parse_from_rfc2822(pub_date)
                             .ok()
-                            .map(|dt| dt.format("%Y-%m-%d").to_string())
+                            .map(|dt| dt.with_timezone(&Local).format("%Y-%m-%d").to_string())
                             .unwrap();
 
-                        let now: String = Utc::now()
-                            .checked_sub_days(Days::new(0))
-                            .unwrap()
-                            .format("%Y-%m-%d")
-                            .to_string();
+                        let now: String = Local::now().format("%Y-%m-%d").to_string();
 
                         return parsed_date == now;
                     })
@@ -85,7 +81,7 @@ async fn get_rss_news() -> Result<(), Box<dyn Error>> {
 
     news.sort_by_key(|f: &ChannelRow| f.pub_date.clone());
 
-    send_via_telegram(news);
+    send_via_telegram(news).await?;
 
     Ok(())
 }
