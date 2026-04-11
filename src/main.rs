@@ -114,7 +114,7 @@ async fn get_rss_news(client: &reqwest::Client) -> Result<Vec<ChannelRow>, Box<d
         "https://cointelegraph.com/feed",
     ];
 
-    let fetched_news = try_join_all(
+    let fetched_news: Vec<Vec<ChannelRow>> = try_join_all(
         rss_providers
             .into_iter()
             .map(|rss_provider| fetch_news_from_web(client, rss_provider)),
@@ -123,7 +123,7 @@ async fn get_rss_news(client: &reqwest::Client) -> Result<Vec<ChannelRow>, Box<d
 
     let mut news: Vec<ChannelRow> = fetched_news.into_iter().flatten().collect();
 
-    news.sort_by_key(|f| DateTime::parse_from_rfc2822(&f.pub_date).ok());
+    news.sort_by_key(|f: &ChannelRow| DateTime::parse_from_rfc2822(&f.pub_date).ok());
 
     Ok(news)
 }
@@ -138,8 +138,8 @@ async fn fetch_news_from_web(
     // Convert to RSS format Channel
     let channel: Channel = Channel::read_from(&req[..])?;
 
-    // Today
-    let today = Local::now().format("%Y-%m-%d").to_string();
+    // Today in date naive for performance reasons
+    let today = Local::now().date_naive();
 
     // Filter by today's news
     let dates: Vec<ChannelRow> = channel
@@ -149,7 +149,7 @@ async fn fetch_news_from_web(
             // The filter map returns None or Some, per item
             let pub_date_str = item.pub_date.as_deref()?;
             let parsed = DateTime::parse_from_rfc2822(pub_date_str).ok()?;
-            let date_str = parsed.with_timezone(&Local).format("%Y-%m-%d").to_string();
+            let date_str = parsed.with_timezone(&Local).date_naive();
             if date_str != today {
                 return None;
             }
