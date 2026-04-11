@@ -160,7 +160,7 @@ async fn send_via_telegram(
         let n = news.iter().map(
             async move |item| -> Result<TelegramResponse, Box<dyn Error>> {
                 let clean_html = ammonia::clean(&item.description);
-                let parsed_html_to_text = from_read(clean_html.as_bytes(), 100).unwrap();
+                let parsed_html_to_text = from_read(clean_html.as_bytes(), 5000)?;
                 let formatted_news = format!("{}", parsed_html_to_text);
 
                 let telegram_message = TelegramMessage {
