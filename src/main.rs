@@ -67,25 +67,41 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let client = reqwest::Client::new();
 
     loop {
-        let news: Vec<ChannelRow> = get_rss_news(&client).await?;
-        let news_sent_to_telegram: Vec<TelegramResponse> = send_via_telegram(&client, news).await?;
+        let news: Result<Vec<ChannelRow>, Box<dyn Error>> = get_rss_news(&client).await;
+        match news {
+            Ok(news) => {
+                let news_sent_to_telegram: Result<Vec<TelegramResponse>, Box<dyn Error>> =
+                    send_via_telegram(&client, news).await;
+                match news_sent_to_telegram {
+                    Ok(news_sent_to_telegram) if news_sent_to_telegram.is_empty() => {
+                        println!("No fresh news found today.");
+                    }
+                    Ok(news_sent_to_telegram) => {
+                        for response in news_sent_to_telegram
+                            .iter()
+                            .filter(|response: &&TelegramResponse| !response.ok)
+                        {
+                            println!(
+                                "Telegram API error: code={:?}, description={:?}, result_present={}",
+                                response.error_code,
+                                response.description,
+                                response.result.is_some()
+                            );
+                        }
 
-        if news_sent_to_telegram.is_empty() {
-            println!("No fresh news found today.");
-        } else {
-            for response in news_sent_to_telegram.iter().filter(|response| !response.ok) {
-                println!(
-                    "Telegram API error: code={:?}, description={:?}, result_present={}",
-                    response.error_code,
-                    response.description,
-                    response.result.is_some()
-                );
+                        println!(
+                            "Did we send it all successfully? {:?}",
+                            news_sent_to_telegram.iter().all(|response| response.ok)
+                        );
+                    }
+                    Err(err) => {
+                        eprintln!("Error sending to Telegram: {err}");
+                    }
+                }
             }
-
-            println!(
-                "Did we send it all successfully? {:?}",
-                news_sent_to_telegram.iter().all(|response| response.ok)
-            );
+            Err(err) => {
+                eprintln!("Error fetching RSS: {err}");
+            }
         }
 
         sleep(Duration::from_hours(3)).await;
