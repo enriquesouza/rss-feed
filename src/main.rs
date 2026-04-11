@@ -157,9 +157,8 @@ async fn send_via_telegram(
     let mut responses: Vec<TelegramResponse> = vec![];
 
     if !news.is_empty() {
-        let n = news
-            .iter()
-            .map(async move |item| -> Result<TelegramResponse, Box<dyn Error>> {
+        let n = news.iter().map(
+            async move |item| -> Result<TelegramResponse, Box<dyn Error>> {
                 let clean_html = ammonia::clean(&item.description);
                 let parsed_html_to_text = from_read(clean_html.as_bytes(), 100).unwrap();
                 let formatted_news = format!("{}", parsed_html_to_text);
@@ -179,7 +178,8 @@ async fn send_via_telegram(
                 let post_response: TelegramResponse = post.json().await?;
 
                 Ok(post_response)
-            });
+            },
+        );
 
         let v: Vec<TelegramResponse> = try_join_all(n).await?;
         responses.extend(v);
