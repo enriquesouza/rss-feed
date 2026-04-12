@@ -7,7 +7,7 @@
     "editor.defaultFormatter": "rust-lang.rust-analyzer"
   },
   "rust-analyzer.cargo.autoreload": true,
-  "rust-analyzer.checkOnSave": true,
+  "rust-analyzer.checkOnSave": false,
   "rust-analyzer.check.command": "clippy",
   "rust-analyzer.check.extraArgs": [
     "--all-targets",

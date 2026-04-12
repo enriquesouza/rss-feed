@@ -4,12 +4,14 @@ use dotenvy::dotenv;
 use html2text::from_read;
 use reqwest::{self};
 use rss::Channel;
-use serde::de::IgnoredAny;
-use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 use std::{env, error::Error};
-use tabled::Tabled;
 use tokio::time::{Duration, sleep};
+
+use rss_feed::models::configs::config::Config;
+use rss_feed::models::rss::channel_row::ChannelRow;
+use rss_feed::models::telegram::telegram_message::TelegramMessage;
+use rss_feed::models::telegram::telegram_response::TelegramResponse;
 
 // The closure is NOT run here; it's saved for later.
 static CONFIG: LazyLock<Config> = LazyLock::new(|| {
@@ -24,41 +26,12 @@ static CONFIG: LazyLock<Config> = LazyLock::new(|| {
     let telegram_send_message_url =
         format!("https://api.telegram.org/bot{telegram_bot_token}/sendMessage");
 
-    let config = Config {
-        telegram_chat_id: telegram_chat_id,
-        telegram_send_message_url: telegram_send_message_url,
-    };
-    config
+    Config {
+        telegram_chat_id,
+        telegram_send_message_url,
+    }
 });
 
-#[derive(Clone)]
-struct Config {
-    pub telegram_chat_id: String,
-    pub telegram_send_message_url: String,
-}
-
-#[derive(Tabled, Serialize, Deserialize)]
-struct ChannelRow {
-    title: String,
-    link: String,
-    description: String,
-    pub_date: String,
-}
-
-#[derive(Serialize)]
-struct TelegramMessage {
-    chat_id: String,
-    text: String,
-    //parse_mode: String,
-}
-
-#[derive(Deserialize)]
-struct TelegramResponse {
-    ok: bool,
-    result: Option<IgnoredAny>,
-    description: Option<String>,
-    error_code: Option<i64>,
-}
 // To show the types I just need to control + option
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -177,7 +150,7 @@ async fn send_via_telegram(
             async move |item| -> Result<TelegramResponse, Box<dyn Error>> {
                 let clean_html = ammonia::clean(&item.description);
                 let parsed_html_to_text = from_read(clean_html.as_bytes(), 5000)?;
-                let formatted_news = format!("{}", parsed_html_to_text);
+                let formatted_news = parsed_html_to_text.to_string();
 
                 let telegram_message = TelegramMessage {
                     chat_id: CONFIG.telegram_chat_id.clone(),

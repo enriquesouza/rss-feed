@@ -1,0 +1,20 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Rust: clippy watch",
+      "type": "shell",
+      "command": "cargo watch -x 'clippy --all-targets --all-features --message-format=short'",
+      "isBackground": true,
+      "problemMatcher": "$rustc-watch",
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "reveal": "never",
+        "panel": "dedicated",
+        "clear": true
+      }
+    }
+  ]
+}
