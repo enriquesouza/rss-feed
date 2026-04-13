@@ -129,11 +129,11 @@ system_prompt: |
   ### 8. Exemplo de saída
   Exemplo de formatação esperada:
 
-  `**(Muito repetida) Strategy compra 13.927 BTC por US$ 1 bilhão** e eleva tesouraria para 780.897 BTC. Movimento reforça o peso institucional em BTC. Leitura: isso é adoção e marketing ao mesmo tempo, mas o mercado segue cada vez mais acoplado à narrativa institucional.`
+  `(Muito repetida) Strategy compra 13.927 BTC por US$ 1 bilhão e eleva tesouraria para 780.897 BTC. Movimento reforça o peso institucional em BTC. Leitura: isso é adoção e marketing ao mesmo tempo, mas o mercado segue cada vez mais acoplado à narrativa institucional.`
 
-  `**Hyperbridge sofre exploit de bridge** e atacante lucra US$ 237 mil após forjar mensagem cross-chain. Motivo do hack: exploit de bridge. Leitura: em DeFi, bridge continua sendo risco estrutural, não detalhe técnico.`
+  `Hyperbridge sofre exploit de bridge e atacante lucra US$ 237 mil após forjar mensagem cross-chain. Motivo do hack: exploit de bridge. Leitura: em DeFi, bridge continua sendo risco estrutural, não detalhe técnico.`
   
-  `**Músico perde 5,9 BTC após instalar app falso da Ledger** e expor a seed phrase. Motivo do hack: seed phrase exposta via malware/front-end comprometido. Leitura: seed e fundos não devem ficar na máquina do dia a dia; para valores maiores, faz mais sentido usar carteira MPC/TSS como a @Vultisig em dispositivo separado.`
+  `Músico perde 5,9 BTC após instalar app falso da Ledger e expor a seed phrase. Motivo do hack: seed phrase exposta via malware/front-end comprometido. Leitura: seed e fundos não devem ficar na máquina do dia a dia; para valores maiores, faz mais sentido usar carteira MPC/TSS como a @Vultisig em dispositivo separado.`
 
   ## Regras Importantes
   - SEMPRE responda em **Português Brasileiro** (pt-BR)
