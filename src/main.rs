@@ -108,14 +108,29 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 async fn get_rss_news(client: &reqwest::Client) -> Result<Vec<ChannelRow>, Box<dyn Error>> {
-    let rss_providers: [&str; 2] = [
-        "https://bitcoinmagazine.com/feed",
+    // Ranked roughly by editorial reach, industry relevance, and confirmed
+    // working RSS availability as of 2026-04-13.
+    let rss_providers: &[&str] = &[
+        "https://www.coindesk.com/arc/outboundfeeds/rss/",
         "https://cointelegraph.com/feed",
+        "https://www.bitcoinmagazine.com/feed",
+        "https://decrypt.co/feed",
+        "https://cryptoslate.com/feed/",
+        "https://beincrypto.com/feed/",
+        "https://thedefiant.io/feed",
+        "https://news.bitcoin.com/feed/",
+        "https://crypto.news/feed/",
+        "https://ambcrypto.com/feed/",
+        "https://dailyhodl.com/feed/",
+        "https://www.newsbtc.com/feed/",
+        "https://u.today/rss",
+        "https://bitcoinist.com/feed/",
     ];
 
     let fetched_news: Vec<Vec<ChannelRow>> = try_join_all(
         rss_providers
-            .into_iter()
+            .iter()
+            .copied()
             .map(|rss_provider| fetch_news_from_web(client, rss_provider)),
     )
     .await?;
