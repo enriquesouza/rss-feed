@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Ok(news) => {
                 let news_to_string = news
                     .iter()
-                    .map(move |f| f.description.clone())
+                    .map(|f| sanitize_rss_text(&f.description))
                     .into_iter()
                     .collect();
 
@@ -180,6 +180,49 @@ async fn fetch_news_from_web(
     Ok(dates)
 }
 
+fn sanitize_rss_text(input: &str) -> String {
+    let clean_html = ammonia::clean(input);
+
+    let text = match from_read(clean_html.as_bytes(), 5000) {
+        Ok(text) => text,
+        Err(_) => clean_html,
+    };
+
+    text.lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn normalize_llm_output_for_telegram(input: &str) -> String {
+    let normalized_breaks = input
+        .replace("\r\n", "\n")
+        .replace('\r', "\n")
+        .replace("<br/><br/>", "\n\n")
+        .replace("<br /><br />", "\n\n")
+        .replace("<br><br>", "\n\n")
+        .replace("<br/>", "\n")
+        .replace("<br />", "\n")
+        .replace("<br>", "\n")
+        .replace("\\n\\n", "\n\n")
+        .replace("\\n", "\n");
+
+    normalized_breaks
+        .split("\n\n")
+        .map(|paragraph| {
+            paragraph
+                .lines()
+                .map(str::trim)
+                .filter(|line| !line.is_empty())
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .filter(|paragraph| !paragraph.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
 async fn send_via_telegram(
     client: &reqwest::Client,
     news: Vec<ChannelRow>,
@@ -189,9 +232,7 @@ async fn send_via_telegram(
     if !news.is_empty() {
         let n = news.iter().map(
             async move |item| -> Result<TelegramResponse, Box<dyn Error>> {
-                let clean_html = ammonia::clean(&item.description);
-                let parsed_html_to_text = from_read(clean_html.as_bytes(), 5000)?;
-                let formatted_news = parsed_html_to_text.to_string();
+                let formatted_news = sanitize_rss_text(&item.description);
 
                 let telegram_message = TelegramMessage {
                     chat_id: CONFIG.telegram_chat_id.clone(),
@@ -225,9 +266,7 @@ async fn send_via_telegram2(
     let mut response: TelegramResponse = Default::default();
 
     if !news.is_empty() {
-        let clean_html = ammonia::clean(&news);
-        let parsed_html_to_text = from_read(clean_html.as_bytes(), 5000)?;
-        let formatted_news = parsed_html_to_text.to_string();
+        let formatted_news = normalize_llm_output_for_telegram(&news);
 
         let telegram_message = TelegramMessage {
             chat_id: CONFIG.telegram_chat_id.clone(),
@@ -244,4 +283,28 @@ async fn send_via_telegram2(
     }
 
     Ok(response)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_llm_output_for_telegram;
+
+    #[test]
+    fn normalizes_literal_newlines_and_br_tags_into_paragraphs() {
+        let input = "(Muito repetida) Strategy compra BTC\\n\\nHyperbridge sofre exploit<br/><br/>Motivo do hack: exploit de bridge";
+        let output = normalize_llm_output_for_telegram(input);
+
+        assert_eq!(
+            output,
+            "(Muito repetida) Strategy compra BTC\n\nHyperbridge sofre exploit\n\nMotivo do hack: exploit de bridge"
+        );
+    }
+
+    #[test]
+    fn trims_lines_without_losing_paragraph_separation() {
+        let input = "Primeira linha  \nsegunda linha\n\n   \nTerceira linha";
+        let output = normalize_llm_output_for_telegram(input);
+
+        assert_eq!(output, "Primeira linha segunda linha\n\nTerceira linha");
+    }
 }
