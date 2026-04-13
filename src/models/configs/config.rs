@@ -1,5 +1,28 @@
+use std::sync::OnceLock;
+
 #[derive(Clone)]
 pub struct Config {
     pub telegram_chat_id: String,
     pub telegram_send_message_url: String,
+}
+
+pub static ENV: OnceLock<Env> = OnceLock::new();
+
+#[derive(Clone, Default)]
+pub struct Env {
+    pub open_router_api_key: String,
+    pub telegram_chat_id: String,
+    pub telegram_bot_token: String,
+}
+
+impl Env {
+    pub fn new() -> &'static Self {
+        ENV.get_or_init(|| Self {
+            open_router_api_key: std::env::var("OPEN_ROUTER_API_KEY")
+                .expect("OPEN_ROUTER_API_KEY not set"),
+            telegram_bot_token: std::env::var("TELEGRAM_BOT_TOKEN")
+                .expect("TELEGRAM_BOT_TOKEN not set"),
+            telegram_chat_id: std::env::var("TELEGRAM_CHAT_ID").expect("TELEGRAM_CHAT_ID not set"),
+        })
+    }
 }

@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde::de::IgnoredAny;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 pub struct TelegramResponse {
     pub ok: bool,
     pub result: Option<IgnoredAny>,

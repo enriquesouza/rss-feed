@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tabled::Tabled;
 
-#[derive(Tabled, Serialize, Deserialize)]
+#[derive(Tabled, Serialize, Deserialize, Debug)]
 pub struct ChannelRow {
     pub title: String,
     pub link: String,

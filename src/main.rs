@@ -4,6 +4,9 @@ use dotenvy::dotenv;
 use html2text::from_read;
 use reqwest::{self};
 use rss::Channel;
+use rss_feed::models::open_router::ChatCompletionResponse;
+use rss_feed::services::open_router_service::OpenRouterService;
+use serde_yml::modules::error::new;
 use std::sync::LazyLock;
 use std::{env, error::Error};
 use tokio::time::{Duration, sleep};
@@ -37,39 +40,62 @@ static CONFIG: LazyLock<Config> = LazyLock::new(|| {
 async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().ok();
 
-    let client = reqwest::Client::new();
+    let client: reqwest::Client = reqwest::Client::new();
+    let open_router_service: OpenRouterService = OpenRouterService::new(&client);
 
     loop {
         let news: Result<Vec<ChannelRow>, Box<dyn Error>> = get_rss_news(&client).await;
+        // dbg!(&news);
         match news {
+            Ok(news) if news.is_empty() => {
+                println!("No fresh news found today.");
+            }
             Ok(news) => {
-                let news_sent_to_telegram: Result<Vec<TelegramResponse>, Box<dyn Error>> =
-                    send_via_telegram(&client, news).await;
-                match news_sent_to_telegram {
-                    Ok(news_sent_to_telegram) if news_sent_to_telegram.is_empty() => {
-                        println!("No fresh news found today.");
-                    }
-                    Ok(news_sent_to_telegram) => {
-                        for response in news_sent_to_telegram
-                            .iter()
-                            .filter(|response: &&TelegramResponse| !response.ok)
-                        {
-                            println!(
-                                "Telegram API error: code={:?}, description={:?}, result_present={}",
-                                response.error_code,
-                                response.description,
-                                response.result.is_some()
-                            );
-                        }
+                let news_to_string = news
+                    .iter()
+                    .map(move |f| f.description.clone())
+                    .into_iter()
+                    .collect();
 
-                        println!(
-                            "Did we send it all successfully? {:?}",
-                            news_sent_to_telegram.iter().all(|response| response.ok)
-                        );
+                // Top number of chars is 4096 for telegram
+                let optimized_news = open_router_service
+                    .get_optimized_news(news_to_string)
+                    .await?
+                    .unwrap_or_default();
+
+                // dbg!(&optimized_news);
+
+                let char_vec: Vec<char> = optimized_news.chars().collect();
+                let chunks: Vec<String> = char_vec
+                    .chunks(4096)
+                    .map(|chunk| chunk.iter().collect()) // Convert &[char] back to String
+                    .collect();
+
+                // dbg!(&chunks);
+                println!("Number of chunks {:?}", &chunks.len());
+                let mut i = 0;
+                for chunk in chunks {
+                    let news_sent_to_telegram: Result<TelegramResponse, Box<dyn Error>> =
+                        send_via_telegram2(&client, chunk).await;
+
+                    match news_sent_to_telegram {
+                        Ok(news_sent_to_telegram) => {
+                            if !news_sent_to_telegram.ok {
+                                println!(
+                                    "Telegram API error: code={:?}, description={:?}, result_present={}",
+                                    news_sent_to_telegram.error_code,
+                                    news_sent_to_telegram.description,
+                                    news_sent_to_telegram.result.is_some()
+                                );
+                            }
+
+                            println!("Did we send it {} successfully? yes", i);
+                        }
+                        Err(err) => {
+                            eprintln!("Error sending to Telegram: {err}");
+                        }
                     }
-                    Err(err) => {
-                        eprintln!("Error sending to Telegram: {err}");
-                    }
+                    i += 1;
                 }
             }
             Err(err) => {
@@ -175,4 +201,32 @@ async fn send_via_telegram(
     }
 
     Ok(responses)
+}
+
+async fn send_via_telegram2(
+    client: &reqwest::Client,
+    news: String,
+) -> Result<TelegramResponse, Box<dyn Error>> {
+    let mut response: TelegramResponse = Default::default();
+
+    if !news.is_empty() {
+        let clean_html = ammonia::clean(&news);
+        let parsed_html_to_text = from_read(clean_html.as_bytes(), 5000)?;
+        let formatted_news = parsed_html_to_text.to_string();
+
+        let telegram_message = TelegramMessage {
+            chat_id: CONFIG.telegram_chat_id.clone(),
+            text: formatted_news,
+        };
+
+        let post = client
+            .post(CONFIG.telegram_send_message_url.clone())
+            .json(&telegram_message)
+            .send()
+            .await?;
+
+        response = post.json().await?;
+    }
+
+    Ok(response)
 }
