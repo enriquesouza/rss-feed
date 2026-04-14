@@ -6,8 +6,7 @@ use crate::models::{
 use reqwest::Client;
 use serde::Deserialize;
 use serde_yml;
-use std::path::Path;
-use std::{fs::read_to_string, str};
+use std::{fs::read_to_string, path::Path};
 pub struct OpenRouterService<'a> {
     client: &'a Client,
 }
@@ -43,7 +42,7 @@ impl<'a> OpenRouterService<'a> {
                 },
                 ChatMessage {
                     role: "user".to_string(),
-                    content: text.clone(),
+                    content: text,
                     tool_calls: None,
                     tool_call_id: None,
                 },
@@ -56,13 +55,15 @@ impl<'a> OpenRouterService<'a> {
             tools: None,
         };
 
-        let completition = self.chat_completion(chat_request).await?;
+        let completion = self.chat_completion(chat_request).await?;
 
-        let first_choice = completition.choices.first();
-        let first_choice_content = first_choice
+        let content = completion
+            .choices
+            .first()
             .map(|item| item.message.content.clone())
             .unwrap_or_default();
-        anyhow::Ok(Some(first_choice_content))
+
+        Ok(Some(content))
     }
 
     pub async fn chat_completion(

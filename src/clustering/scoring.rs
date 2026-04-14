@@ -14,7 +14,7 @@ pub fn compare_topic_cluster_priority(
         .then_with(|| newest_cluster_datetime(right).cmp(&newest_cluster_datetime(left)))
 }
 
-pub fn topic_cluster_priority(cluster: &TopicCluster) -> i32 {
+fn topic_cluster_priority(cluster: &TopicCluster) -> i32 {
     let best_item_score = cluster
         .items
         .iter()
@@ -33,7 +33,7 @@ pub fn topic_cluster_priority(cluster: &TopicCluster) -> i32 {
     best_item_score + repetition_bonus + source_bonus + bucket_bonus
 }
 
-pub fn newest_cluster_datetime(cluster: &TopicCluster) -> Option<DateTime<chrono::FixedOffset>> {
+fn newest_cluster_datetime(cluster: &TopicCluster) -> Option<DateTime<chrono::FixedOffset>> {
     cluster
         .items
         .iter()

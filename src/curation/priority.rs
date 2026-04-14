@@ -1,6 +1,5 @@
 use crate::curation::signals::{is_low_signal_item, is_technical_or_security};
 use crate::curation::sources::is_high_volume_general_source;
-use crate::formatters::text::parse_feed_datetime;
 use crate::models::configs::config::CURATION_CONFIG;
 use crate::models::rss::channel_row::ChannelRow;
 
@@ -44,12 +43,4 @@ pub fn news_priority_score(item: &ChannelRow) -> i32 {
     }
 
     score
-}
-
-pub fn compare_news_priority(left: &ChannelRow, right: &ChannelRow) -> std::cmp::Ordering {
-    news_priority_score(right)
-        .cmp(&news_priority_score(left))
-        .then_with(|| {
-            parse_feed_datetime(&right.pub_date).cmp(&parse_feed_datetime(&left.pub_date))
-        })
 }

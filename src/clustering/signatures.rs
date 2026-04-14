@@ -25,7 +25,7 @@ pub fn topic_signature(item: &ChannelRow) -> Vec<String> {
     tokens
 }
 
-pub fn normalize_topic_text(input: &str) -> String {
+fn normalize_topic_text(input: &str) -> String {
     let mut normalized = input.to_lowercase();
 
     for (needle, replacement) in &CURATION_CONFIG.topic_normalization {
@@ -44,7 +44,7 @@ pub fn normalize_topic_text(input: &str) -> String {
         .collect()
 }
 
-pub fn canonical_topic_token(token: &str) -> Option<String> {
+fn canonical_topic_token(token: &str) -> Option<String> {
     let canonical = CURATION_CONFIG
         .canonical_tokens
         .get(token)
@@ -58,7 +58,7 @@ pub fn canonical_topic_token(token: &str) -> Option<String> {
     Some(canonical.to_string())
 }
 
-pub fn is_topic_stopword(token: &str) -> bool {
+fn is_topic_stopword(token: &str) -> bool {
     CURATION_CONFIG.topic_stopwords.contains(token)
 }
 

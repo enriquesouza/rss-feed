@@ -63,7 +63,7 @@ pub fn cluster_news_for_llm(news: &[ChannelRow]) -> Vec<TopicCluster> {
     selected
 }
 
-pub fn should_merge_topic_cluster(
+fn should_merge_topic_cluster(
     cluster: &TopicCluster,
     item: &ChannelRow,
     bucket: &str,
@@ -89,7 +89,7 @@ pub fn should_merge_topic_cluster(
     overlap >= 1 && has_specific_signature_overlap(&cluster.signature, signature)
 }
 
-pub fn merge_topic_cluster(
+fn merge_topic_cluster(
     cluster: &mut TopicCluster,
     item: ChannelRow,
     signature: Vec<String>,

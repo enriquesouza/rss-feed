@@ -1,4 +1,3 @@
-pub mod chat;
 pub mod configs;
 pub mod open_router;
 pub mod rss;

@@ -41,7 +41,7 @@ pub async fn get_rss_news(client: &reqwest::Client) -> Result<Vec<ChannelRow>, B
     Ok(news)
 }
 
-pub async fn fetch_news_from_web(
+async fn fetch_news_from_web(
     client: &reqwest::Client,
     rss_provider: &str,
 ) -> Result<Vec<ChannelRow>, Box<dyn Error>> {
