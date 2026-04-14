@@ -1,8 +1,7 @@
 use crate::models::open_router::ChatMessage;
-use crate::models::telegram::telegram_response::TelegramResponse;
 use crate::models::{
     configs::config::Env,
-    open_router::{ChatCompletionResponse, ChatRequest},
+    open_router::{ChatCompletionResponse, ChatRequest, UsageConfig},
 };
 use reqwest::Client;
 use serde::Deserialize;
@@ -31,10 +30,9 @@ impl<'a> OpenRouterService<'a> {
         let yml = read_to_string(&path)?;
         let yml_prompt: SystemPrompt = serde_yml::from_str(&yml)?;
 
-        let text = request.join(" ");
+        let text = request.join("\n\n---\n\n");
 
         let chat_request = ChatRequest {
-            // model: "minimax/minimax-m2.7".into(),
             model: "x-ai/grok-4.1-fast".into(),
             messages: vec![
                 ChatMessage {
@@ -51,21 +49,20 @@ impl<'a> OpenRouterService<'a> {
                 },
             ],
             stream: false,
-            temperature: Some(0.3),
-            max_tokens: None,
-            usage: None,
+            temperature: Some(0.9),
+            max_tokens: Some(4000),
+            usage: Some(UsageConfig { include: true }),
             stream_options: None,
             tools: None,
         };
 
         let completition = self.chat_completion(chat_request).await?;
 
-        let first_choice: Option<String> = completition
-            .choices
-            .first()
-            .map(|item| item.message.content.clone());
-
-        anyhow::Ok(first_choice)
+        let first_choice = completition.choices.first();
+        let first_choice_content = first_choice
+            .map(|item| item.message.content.clone())
+            .unwrap_or_default();
+        anyhow::Ok(Some(first_choice_content))
     }
 
     pub async fn chat_completion(
@@ -73,32 +70,46 @@ impl<'a> OpenRouterService<'a> {
         request: ChatRequest,
     ) -> anyhow::Result<ChatCompletionResponse> {
         let api_key = Env::new().open_router_api_key.clone();
+        let mut last_error: Option<anyhow::Error> = None;
 
-        let _request_start = std::time::Instant::now();
+        for attempt in 1..=3 {
+            let req_future = async {
+                let res = self
+                    .client
+                    .post("https://openrouter.ai/api/v1/chat/completions")
+                    .header("Authorization", format!("Bearer {}", api_key))
+                    .header("Content-Type", "application/json")
+                    .header("HTTP-Referer", "https://compra.ai")
+                    .header("X-Title", "compra.ai")
+                    .json(&request)
+                    .send()
+                    .await?;
+                if !res.status().is_success() {
+                    let error_text = res.text().await?;
+                    return Err(anyhow::anyhow!("OpenRouter error: {}", error_text));
+                }
 
-        let req_future = async {
-            let res = self
-                .client
-                .post("https://openrouter.ai/api/v1/chat/completions")
-                .header("Authorization", format!("Bearer {}", api_key))
-                .header("Content-Type", "application/json")
-                .header("HTTP-Referer", "https://compra.ai")
-                .header("X-Title", "compra.ai")
-                .json(&request)
-                .send()
-                .await?;
-            if !res.status().is_success() {
-                let error_text = res.text().await?;
-                return Err(anyhow::anyhow!("OpenRouter error: {}", error_text));
+                let response: ChatCompletionResponse = res.json::<ChatCompletionResponse>().await?;
+                Ok(response)
+            };
+
+            match tokio::time::timeout(std::time::Duration::from_secs(120), req_future).await {
+                Ok(Ok(response)) => return Ok(response),
+                Ok(Err(err)) => {
+                    last_error = Some(err);
+                }
+                Err(_) => {
+                    let timeout_error = anyhow::anyhow!("OpenRouter API timeout after 120s");
+
+                    last_error = Some(timeout_error);
+                }
             }
 
-            let response: ChatCompletionResponse = res.json::<ChatCompletionResponse>().await?;
-            Ok(response)
-        };
-
-        match tokio::time::timeout(std::time::Duration::from_secs(120), req_future).await {
-            Ok(res) => res,
-            Err(_) => Err(anyhow::anyhow!("OpenRouter API timeout after 120s")),
+            if attempt < 3 {
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            }
         }
+
+        Err(last_error.unwrap_or_else(|| anyhow::anyhow!("OpenRouter request failed")))
     }
 }

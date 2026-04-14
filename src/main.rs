@@ -1,41 +1,24 @@
-use ::futures::future::try_join_all;
-use chrono::{self, DateTime, Local};
 use dotenvy::dotenv;
-use html2text::from_read;
-use reqwest::{self};
-use rss::Channel;
-use rss_feed::models::open_router::ChatCompletionResponse;
-use rss_feed::services::open_router_service::OpenRouterService;
-use serde_yml::modules::error::new;
-use std::sync::LazyLock;
-use std::{env, error::Error};
+use std::error::Error;
 use tokio::time::{Duration, sleep};
 
-use rss_feed::models::configs::config::Config;
-use rss_feed::models::rss::channel_row::ChannelRow;
-use rss_feed::models::telegram::telegram_message::TelegramMessage;
-use rss_feed::models::telegram::telegram_response::TelegramResponse;
+pub mod clustering;
+pub mod curation;
+pub mod formatters;
+pub mod models;
+pub mod rss;
+pub mod services;
+pub mod telegram;
 
-// The closure is NOT run here; it's saved for later.
-static CONFIG: LazyLock<Config> = LazyLock::new(|| {
-    let telegram_bot_token = env::var("TELEGRAM_BOT_TOKEN")
-        .map_err(|_| "missing TELEGRAM_BOT_TOKEN env var")
-        .expect("TELEGRAM_BOT_TOKEN is needed");
+use crate::clustering::engine::cluster_news_for_llm;
+use crate::clustering::formatter::format_topic_cluster_for_llm;
+use crate::curation::engine::curate_news_for_llm;
+use crate::models::rss::channel_row::ChannelRow;
+use crate::models::telegram::telegram_response::TelegramResponse;
+use crate::rss::fetch::get_rss_news;
+use crate::services::open_router_service::OpenRouterService;
+use crate::telegram::sender::send_via_telegram2;
 
-    let telegram_chat_id = env::var("TELEGRAM_CHAT_ID")
-        .map_err(|_| "missing TELEGRAM_CHAT_ID env var")
-        .expect("TELEGRAM_CHAT_ID is needed");
-
-    let telegram_send_message_url =
-        format!("https://api.telegram.org/bot{telegram_bot_token}/sendMessage");
-
-    Config {
-        telegram_chat_id,
-        telegram_send_message_url,
-    }
-});
-
-// To show the types I just need to control + option
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().ok();
@@ -45,266 +28,40 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     loop {
         let news: Result<Vec<ChannelRow>, Box<dyn Error>> = get_rss_news(&client).await;
-        // dbg!(&news);
-        match news {
-            Ok(news) if news.is_empty() => {
-                println!("No fresh news found today.");
-            }
-            Ok(news) => {
-                let news_to_string = news
-                    .iter()
-                    .map(|f| sanitize_rss_text(&f.description))
-                    .into_iter()
-                    .collect();
 
-                // Top number of chars is 4096 for telegram
+        match news {
+            Ok(news) if news.is_empty() => {}
+            Ok(news) => {
+                let curated_news = curate_news_for_llm(&news);
+
+                let topic_clusters = cluster_news_for_llm(&curated_news);
+
+                let news_to_string = topic_clusters
+                    .iter()
+                    .map(format_topic_cluster_for_llm)
+                    .collect::<Vec<_>>();
+
                 let optimized_news = open_router_service
                     .get_optimized_news(news_to_string)
                     .await?
                     .unwrap_or_default();
 
-                // dbg!(&optimized_news);
-
                 let char_vec: Vec<char> = optimized_news.chars().collect();
                 let chunks: Vec<String> = char_vec
                     .chunks(4096)
-                    .map(|chunk| chunk.iter().collect()) // Convert &[char] back to String
+                    .map(|chunk| chunk.iter().collect())
                     .collect();
 
-                // dbg!(&chunks);
-                println!("Number of chunks {:?}", &chunks.len());
-                let mut i = 0;
-                for chunk in chunks {
+                for chunk in chunks.into_iter() {
                     let news_sent_to_telegram: Result<TelegramResponse, Box<dyn Error>> =
                         send_via_telegram2(&client, chunk).await;
 
-                    match news_sent_to_telegram {
-                        Ok(news_sent_to_telegram) => {
-                            if !news_sent_to_telegram.ok {
-                                println!(
-                                    "Telegram API error: code={:?}, description={:?}, result_present={}",
-                                    news_sent_to_telegram.error_code,
-                                    news_sent_to_telegram.description,
-                                    news_sent_to_telegram.result.is_some()
-                                );
-                            }
-
-                            println!("Did we send it {} successfully? yes", i);
-                        }
-                        Err(err) => {
-                            eprintln!("Error sending to Telegram: {err}");
-                        }
-                    }
-                    i += 1;
+                    let _ = news_sent_to_telegram;
                 }
             }
-            Err(err) => {
-                eprintln!("Error fetching RSS: {err}");
-            }
+            Err(_) => {}
         }
 
         sleep(Duration::from_hours(3)).await;
-    }
-}
-
-async fn get_rss_news(client: &reqwest::Client) -> Result<Vec<ChannelRow>, Box<dyn Error>> {
-    // Ranked roughly by editorial reach, industry relevance, and confirmed
-    // working RSS availability as of 2026-04-13.
-    let rss_providers: &[&str] = &[
-        "https://www.coindesk.com/arc/outboundfeeds/rss/",
-        "https://cointelegraph.com/feed",
-        "https://www.bitcoinmagazine.com/feed",
-        "https://decrypt.co/feed",
-        "https://cryptoslate.com/feed/",
-        "https://beincrypto.com/feed/",
-        "https://thedefiant.io/feed",
-        "https://news.bitcoin.com/feed/",
-        "https://crypto.news/feed/",
-        "https://ambcrypto.com/feed/",
-        "https://dailyhodl.com/feed/",
-        "https://www.newsbtc.com/feed/",
-        "https://u.today/rss",
-        "https://bitcoinist.com/feed/",
-    ];
-
-    let fetched_news: Vec<Vec<ChannelRow>> = try_join_all(
-        rss_providers
-            .iter()
-            .copied()
-            .map(|rss_provider| fetch_news_from_web(client, rss_provider)),
-    )
-    .await?;
-
-    let mut news: Vec<ChannelRow> = fetched_news.into_iter().flatten().collect();
-
-    news.sort_by_key(|f: &ChannelRow| DateTime::parse_from_rfc2822(&f.pub_date).ok());
-
-    Ok(news)
-}
-
-async fn fetch_news_from_web(
-    client: &reqwest::Client,
-    rss_provider: &str,
-) -> Result<Vec<ChannelRow>, Box<dyn Error>> {
-    // Get the XML RSS format from the feed on web
-    let req = client.get(rss_provider).send().await?.bytes().await?;
-
-    // Convert to RSS format Channel
-    let channel: Channel = Channel::read_from(&req[..])?;
-
-    // Today in date naive for performance reasons
-    let today = Local::now().date_naive();
-
-    // Filter by today's news
-    let dates: Vec<ChannelRow> = channel
-        .items()
-        .iter()
-        .filter_map(|item| {
-            // The filter map returns None or Some, per item
-            let pub_date_str = item.pub_date.as_deref()?;
-            let parsed = DateTime::parse_from_rfc2822(pub_date_str).ok()?;
-            let date_str = parsed.with_timezone(&Local).date_naive();
-            if date_str != today {
-                return None;
-            }
-
-            Some(ChannelRow {
-                title: item.title.clone().unwrap_or_default(),
-                link: item.link.clone().unwrap_or_default(),
-                description: item.description.clone().unwrap_or_default(),
-                pub_date: item.pub_date.clone().unwrap_or_default(),
-            })
-        })
-        .collect();
-
-    Ok(dates)
-}
-
-fn sanitize_rss_text(input: &str) -> String {
-    let clean_html = ammonia::clean(input);
-
-    let text = match from_read(clean_html.as_bytes(), 5000) {
-        Ok(text) => text,
-        Err(_) => clean_html,
-    };
-
-    text.lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-fn normalize_llm_output_for_telegram(input: &str) -> String {
-    let normalized_breaks = input
-        .replace("\r\n", "\n")
-        .replace('\r', "\n")
-        .replace("<br/><br/>", "\n\n")
-        .replace("<br /><br />", "\n\n")
-        .replace("<br><br>", "\n\n")
-        .replace("<br/>", "\n")
-        .replace("<br />", "\n")
-        .replace("<br>", "\n")
-        .replace("\\n\\n", "\n\n")
-        .replace("\\n", "\n");
-
-    normalized_breaks
-        .split("\n\n")
-        .map(|paragraph| {
-            paragraph
-                .lines()
-                .map(str::trim)
-                .filter(|line| !line.is_empty())
-                .collect::<Vec<_>>()
-                .join(" ")
-        })
-        .filter(|paragraph| !paragraph.is_empty())
-        .collect::<Vec<_>>()
-        .join("\n\n")
-}
-
-async fn send_via_telegram(
-    client: &reqwest::Client,
-    news: Vec<ChannelRow>,
-) -> Result<Vec<TelegramResponse>, Box<dyn Error>> {
-    let mut responses: Vec<TelegramResponse> = vec![];
-
-    if !news.is_empty() {
-        let n = news.iter().map(
-            async move |item| -> Result<TelegramResponse, Box<dyn Error>> {
-                let formatted_news = sanitize_rss_text(&item.description);
-
-                let telegram_message = TelegramMessage {
-                    chat_id: CONFIG.telegram_chat_id.clone(),
-                    text: formatted_news,
-                    //parse_mode: "HTML".to_string(),
-                };
-
-                let post = client
-                    .post(CONFIG.telegram_send_message_url.clone())
-                    .json(&telegram_message)
-                    .send()
-                    .await?;
-
-                let post_response: TelegramResponse = post.json().await?;
-
-                Ok(post_response)
-            },
-        );
-
-        let v: Vec<TelegramResponse> = try_join_all(n).await?;
-        responses.extend(v);
-    }
-
-    Ok(responses)
-}
-
-async fn send_via_telegram2(
-    client: &reqwest::Client,
-    news: String,
-) -> Result<TelegramResponse, Box<dyn Error>> {
-    let mut response: TelegramResponse = Default::default();
-
-    if !news.is_empty() {
-        let formatted_news = normalize_llm_output_for_telegram(&news);
-
-        let telegram_message = TelegramMessage {
-            chat_id: CONFIG.telegram_chat_id.clone(),
-            text: formatted_news,
-        };
-
-        let post = client
-            .post(CONFIG.telegram_send_message_url.clone())
-            .json(&telegram_message)
-            .send()
-            .await?;
-
-        response = post.json().await?;
-    }
-
-    Ok(response)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::normalize_llm_output_for_telegram;
-
-    #[test]
-    fn normalizes_literal_newlines_and_br_tags_into_paragraphs() {
-        let input = "(Muito repetida) Strategy compra BTC\\n\\nHyperbridge sofre exploit<br/><br/>Motivo do hack: exploit de bridge";
-        let output = normalize_llm_output_for_telegram(input);
-
-        assert_eq!(
-            output,
-            "(Muito repetida) Strategy compra BTC\n\nHyperbridge sofre exploit\n\nMotivo do hack: exploit de bridge"
-        );
-    }
-
-    #[test]
-    fn trims_lines_without_losing_paragraph_separation() {
-        let input = "Primeira linha  \nsegunda linha\n\n   \nTerceira linha";
-        let output = normalize_llm_output_for_telegram(input);
-
-        assert_eq!(output, "Primeira linha segunda linha\n\nTerceira linha");
     }
 }

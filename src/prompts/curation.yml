@@ -1,0 +1,368 @@
+rss_providers:
+  - "https://www.coindesk.com/arc/outboundfeeds/rss/"
+  - "https://cointelegraph.com/feed"
+  - "https://www.bitcoinmagazine.com/feed"
+  - "https://decrypt.co/feed"
+  - "https://cryptoslate.com/feed/"
+  - "https://beincrypto.com/feed/"
+  - "https://thedefiant.io/feed"
+  - "https://news.bitcoin.com/feed/"
+  - "https://crypto.news/feed/"
+  - "https://ambcrypto.com/feed/"
+  - "https://dailyhodl.com/feed/"
+  - "https://www.newsbtc.com/feed/"
+  - "https://u.today/rss"
+  - "https://bitcoinist.com/feed/"
+  - "https://solanafloor.com/feed.xml"
+  - "https://www.cryptopolitan.com/feed/"
+  - "https://blog.lopp.net/rss/"
+  - "https://blog.ethereum.org/feed.xml"
+  - "https://www.helius.dev/blog/rss.xml"
+  - "https://blog.syndica.io/rss/"
+  - "https://blog.carbium.io/feed"
+  - "https://www.zcashcommunity.com/feed/"
+  - "https://medium.com/feed/@BNBCHAIN"
+  - "https://blog.sui.io/feed/"
+  - "https://medium.com/feed/@opentensor"
+  - "https://medium.com/feed/@bittensor"
+  - "https://dailyhodl.com/tag/bittensor/feed/"
+  - "https://dailyhodl.com/tag/world-liberty-financial/feed/"
+  - "https://cryptoslate.com/tag/world-liberty-financial/feed/"
+  - "https://news.bitcoin.com/tag/world-liberty-financial/feed/"
+  - "https://www.cryptopolitan.com/tag/venice-ai/feed/"
+  - "https://blog.openzeppelin.com/rss.xml"
+  - "https://forum.openzeppelin.com/latest.rss"
+  - "https://forum.soliditylang.org/latest.rss"
+  - "https://forum.soliditylang.org/c/announcements.rss"
+  - "https://blog.trailofbits.com/feed/"
+  - "https://immunefi.com/blog/feed/"
+  - "https://osec.io/rss.xml"
+  - "https://www.halborn.com/blog/feed.xml"
+  - "https://www.chainalysis.com/blog/rss/"
+  - "https://blog.rust-lang.org/feed.xml"
+  - "https://blog.rust-lang.org/inside-rust/feed.xml"
+  - "https://this-week-in-rust.org/rss.xml"
+  - "https://tokio.rs/blog/index.xml"
+  - "https://rustsec.org/feed.xml"
+  - "https://blog.cloudflare.com/tag/rust/rss/"
+  - "https://blog.neodyme.io/rss.xml"
+
+slower_technical_feeds:
+  - "blog.ethereum.org"
+  - "helius.dev"
+  - "blog.syndica.io"
+  - "blog.carbium.io"
+  - "zcashcommunity.com"
+  - "medium.com/feed/@BNBCHAIN"
+  - "blog.sui.io"
+  - "medium.com/feed/@opentensor"
+  - "medium.com/feed/@bittensor"
+  - "blog.openzeppelin.com"
+  - "forum.openzeppelin.com"
+  - "forum.soliditylang.org"
+  - "blog.trailofbits.com"
+  - "immunefi.com/blog"
+  - "osec.io"
+  - "halborn.com"
+  - "chainalysis.com/blog"
+  - "blog.rust-lang.org"
+  - "this-week-in-rust.org"
+  - "tokio.rs"
+  - "rustsec.org"
+  - "blog.cloudflare.com/tag/rust"
+  - "blog.neodyme.io"
+
+topic_normalization:
+  "world liberty financial": "wlfi"
+  "microstrategy": "strategy"
+  "ledger live": "ledger_live"
+  "open zeppelin": "openzeppelin"
+  "trail of bits": "trailofbits"
+  "bank of korea": "bank_of_korea"
+  "american bankers association": "aba"
+  "u.s.": "us"
+  "u.s": "us"
+  "us$": "usd"
+
+canonical_tokens:
+  bitcoin: btc
+  ethereum: eth
+  solana: sol
+  zcash: zec
+  stablecoins: stablecoin
+  tokens: token
+  bridged: bridge
+  mints: mint
+  minted: mint
+  minting: mint
+  buys: buy
+  bought: buy
+  buying: buy
+  purchase: buy
+  purchased: buy
+  warns: warn
+  warning: warn
+  rules: rule
+  advisories: advisory
+  hacks: hack
+  markets: market
+  wallets: wallet
+  regulators: regulation
+  regulatory: regulation
+  securitys: security
+
+topic_stopwords:
+  - "the"
+  - "and"
+  - "for"
+  - "with"
+  - "amid"
+  - "after"
+  - "from"
+  - "into"
+  - "over"
+  - "under"
+  - "this"
+  - "that"
+  - "these"
+  - "those"
+  - "what"
+  - "when"
+  - "where"
+  - "why"
+  - "how"
+  - "here"
+  - "today"
+  - "week"
+  - "report"
+  - "analysis"
+  - "breaking"
+  - "latest"
+  - "new"
+  - "now"
+  - "says"
+  - "could"
+  - "would"
+  - "should"
+  - "your"
+  - "their"
+  - "they"
+  - "them"
+  - "just"
+  - "near"
+  - "past"
+  - "more"
+  - "less"
+  - "very"
+  - "still"
+  - "todays"
+  - "crypto"
+  - "market"
+  - "price"
+  - "prices"
+  - "token"
+  - "tokens"
+  - "coins"
+  - "coin"
+  - "news"
+  - "update"
+  - "updates"
+  - "lead"
+  - "leads"
+  - "signals"
+  - "signal"
+  - "moves"
+  - "move"
+  - "rally"
+  - "surge"
+  - "drop"
+  - "risk"
+  - "output"
+  - "guide"
+  - "minute"
+  - "performance"
+
+generic_cluster_tokens:
+  - "btc"
+  - "eth"
+  - "sol"
+  - "dot"
+  - "xrp"
+  - "hack"
+  - "exploit"
+  - "bridge"
+  - "security"
+  - "regulation"
+  - "stablecoin"
+  - "advisory"
+  - "release"
+  - "upgrade"
+  - "funding"
+  - "buy"
+  - "wallet"
+  - "market"
+  - "treasury"
+  - "dao"
+  - "yield"
+  - "rule"
+  - "guidance"
+
+editorial_buckets:
+  - id: "rust-rustsec"
+    keywords: ["rustsec", "rust", "tokio", "wasmtime", "crates.io"]
+    cap: 3
+    priority_bonus: 40
+  - id: "smart-contract-security"
+    keywords: ["openzeppelin", "solidity", "smart contract", "smart-contract", "trailofbits", "trail of bits", "audit", "mutation testing", "mewt", "muton"]
+    cap: 3
+    priority_bonus: 40
+  - id: "hacks-exploits"
+    keywords: ["hack", "exploit", "seed phrase", "private key", "fake ledger", "bridge", "attacker", "drain", "breach", "malware", "phishing"]
+    cap: 4
+    priority_bonus: 25
+  - id: "stablecoins-payments"
+    keywords: ["stablecoin", "usdc", "usdt", "rlusd", "circle", "payment rail", "yield-bearing"]
+    cap: 3
+    priority_bonus: 25
+  - id: "regulation-market-structure"
+    keywords: ["sec ", "commission", "mica", "esma", "fca", "clarity act", "compliance", "lawmaker", "legislation"]
+    cap: 3
+    priority_bonus: 20
+  - id: "btc-corporate"
+    keywords: ["microstrategy", "saylor", "metaplanet", "mara", "corporate treasury", "sovereign", "strategic reserve"]
+    cap: 3
+    priority_bonus: 20
+  - id: "ethereum-evm"
+    keywords: ["layer 2", "l2", "rollup", "arbitrum", "optimism", "base", "blob", "eip", "vitalik"]
+    cap: 3
+    priority_bonus: 40
+  - id: "solana-infra"
+    keywords: ["firedancer", "jito", "solana", "helius", "anza", "agave", "svm"]
+    cap: 3
+    priority_bonus: 40
+  - id: "macro-geopolitics"
+    keywords: ["fomc", "interest rate", "powell", "fed ", "inflation", "cpi", "election", "geopolitics"]
+    cap: 3
+    priority_bonus: 20
+  - id: "ai-agents-security"
+    keywords: ["ai agent", "carbium", "venice", "bittensor", "tao ", "zkml", "tee", "autonomous", "inference"]
+    cap: 3
+    priority_bonus: 25
+  - id: "general-market"
+    keywords: []
+    cap: 2
+    priority_bonus: 0
+
+priority_keywords_80:
+  - "rust"
+  - "rustsec"
+  - "tokio"
+  - "solidity"
+  - "openzeppelin"
+  - "ethereum"
+  - "eip"
+  - "evm"
+  - "solana"
+  - "anchor"
+  - "svm"
+  - "helius"
+  - "syndica"
+  - "carbium"
+  - "audit"
+  - "advisory"
+  - "vulnerability"
+  - "cve"
+  - "exploit"
+  - "post-mortem"
+  - "post mortem"
+  - "incident"
+  - "bug digest"
+  - "upgrade"
+  - "release"
+  - "compiler"
+  - "smart contract"
+
+priority_keywords_60:
+  - "hack"
+  - "breach"
+  - "exploit"
+  - "attacker"
+  - "minted"
+  - "drain"
+  - "drift hack"
+  - "hyperbridge"
+  - "bridge"
+  - "privileged access"
+  - "phishing"
+  - "seed phrase"
+  - "private key"
+
+technical_or_security_keywords:
+  - "blog.rust-lang.org"
+  - "rustsec.org"
+  - "this-week-in-rust.org"
+  - "tokio.rs"
+  - "blog.openzeppelin.com"
+  - "forum.openzeppelin.com"
+  - "forum.soliditylang.org"
+  - "blog.ethereum.org"
+  - "helius.dev"
+  - "blog.syndica.io"
+  - "blog.carbium.io"
+  - "blog.sui.io"
+  - "blog.trailofbits.com"
+  - "chainalysis.com/blog"
+  - "halborn.com"
+  - "osec.io"
+  - "immunefi.com/blog"
+  - "rust"
+  - "tokio"
+  - "solidity"
+  - "openzeppelin"
+  - "ethereum"
+  - "eip"
+  - "evm"
+  - "solana"
+  - "anchor"
+  - "svm"
+  - "audit"
+  - "advisory"
+  - "cve"
+  - "vulnerability"
+  - "bug"
+  - "release"
+  - "compiler"
+  - "smart contract"
+  - "smart-contract"
+  - "security"
+  - "hack"
+  - "exploit"
+  - "incident"
+  - "post-mortem"
+  - "post mortem"
+  - "bridge"
+
+low_signal_keywords:
+  - "price prediction"
+  - "top analyst says"
+  - "here’s what happened in crypto today"
+  - "here's what happened in crypto today"
+  - "returned to $1"
+  - "bullish exchange activity"
+  - "extreme fear"
+  - "contrarian signal"
+  - "think ₿igger"
+  - "think bigger"
+
+high_volume_general_sources:
+  - "www.coindesk.com"
+  - "cointelegraph.com"
+  - "crypto.news"
+  - "u.today"
+  - "ambcrypto.com"
+  - "www.cryptopolitan.com"
+  - "www.newsbtc.com"
+  - "bitcoinist.com"
+  - "beincrypto.com"
+  - "news.bitcoin.com"
+  - "decrypt.co"

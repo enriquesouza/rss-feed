@@ -8,6 +8,15 @@ pub struct Config {
 
 pub static ENV: OnceLock<Env> = OnceLock::new();
 
+pub static CURATION_CONFIG: std::sync::LazyLock<super::curation::CurationConfig> =
+    std::sync::LazyLock::new(|| {
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+        let path = std::path::Path::new(&manifest_dir).join("src/prompts/curation.yml");
+        let content =
+            std::fs::read_to_string(&path).unwrap_or_else(|_| panic!("Could not read {:?}", path));
+        serde_yml::from_str(&content).expect("Failed to parse curation.yml")
+    });
+
 #[derive(Clone, Default)]
 pub struct Env {
     pub open_router_api_key: String,
