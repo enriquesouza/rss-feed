@@ -1,4 +1,3 @@
-use crate::formatters::html::sanitize_rss_text;
 use crate::models::configs::config::CURATION_CONFIG;
 use crate::models::rss::channel_row::ChannelRow;
 
@@ -8,7 +7,7 @@ pub fn is_technical_or_security(item: &ChannelRow) -> bool {
         item.source,
         item.title.to_lowercase(),
         item.link.to_lowercase(),
-        sanitize_rss_text(&item.description).to_lowercase()
+        item.sanitized_description.to_lowercase()
     );
 
     CURATION_CONFIG

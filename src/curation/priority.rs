@@ -1,6 +1,5 @@
 use crate::curation::signals::{is_low_signal_item, is_technical_or_security};
 use crate::curation::sources::is_high_volume_general_source;
-use crate::formatters::html::sanitize_rss_text;
 use crate::formatters::text::parse_feed_datetime;
 use crate::models::configs::config::CURATION_CONFIG;
 use crate::models::rss::channel_row::ChannelRow;
@@ -11,7 +10,7 @@ pub fn news_priority_score(item: &ChannelRow) -> i32 {
         item.source,
         item.title.to_lowercase(),
         item.link.to_lowercase(),
-        sanitize_rss_text(&item.description).to_lowercase()
+        item.sanitized_description.to_lowercase()
     );
 
     let mut score = 0i32;

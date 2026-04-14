@@ -1,5 +1,4 @@
 use crate::clustering::scoring::distinct_source_count;
-use crate::formatters::html::sanitize_rss_text;
 use crate::models::topic_cluster::TopicCluster;
 const MAX_ARTICLES_PER_TOPIC_CLUSTER: usize = 6;
 
@@ -25,10 +24,7 @@ pub fn format_topic_cluster_for_llm(cluster: &TopicCluster) -> String {
         .map(|item| {
             format!(
                 "- [{}] {} | {}\n  {}",
-                item.source,
-                item.pub_date,
-                item.title,
-                sanitize_rss_text(&item.description)
+                item.source, item.pub_date, item.title, item.sanitized_description
             )
         })
         .collect::<Vec<_>>()

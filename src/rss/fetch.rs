@@ -1,3 +1,4 @@
+use crate::formatters::html::sanitize_rss_text;
 use crate::formatters::text::parse_feed_datetime;
 use crate::formatters::text::source_label;
 use crate::models::configs::config::CURATION_CONFIG;
@@ -72,6 +73,8 @@ pub async fn fetch_news_from_web(
                 .or_else(|| entry.content.and_then(|content| content.body))
                 .unwrap_or_default();
 
+            let sanitized_description = sanitize_rss_text(&description);
+
             Some(ChannelRow {
                 source: source.clone(),
                 title,
@@ -82,6 +85,7 @@ pub async fn fetch_news_from_web(
                     .map(|link| link.href)
                     .unwrap_or_default(),
                 description,
+                sanitized_description,
                 pub_date: parsed.to_rfc3339(),
             })
         })

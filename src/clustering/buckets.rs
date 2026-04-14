@@ -1,5 +1,4 @@
 use crate::clustering::signatures::is_generic_cluster_token;
-use crate::formatters::html::sanitize_rss_text;
 use crate::models::configs::config::CURATION_CONFIG;
 use crate::models::rss::channel_row::ChannelRow;
 
@@ -9,7 +8,7 @@ pub fn infer_editorial_bucket(item: &ChannelRow) -> String {
         item.source,
         item.title.to_lowercase(),
         item.link.to_lowercase(),
-        sanitize_rss_text(&item.description).to_lowercase()
+        item.sanitized_description.to_lowercase()
     );
 
     for bucket in &CURATION_CONFIG.editorial_buckets {

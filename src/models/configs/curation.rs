@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Deserialize)]
 pub struct EditorialBucket {
@@ -15,8 +15,8 @@ pub struct CurationConfig {
     pub slower_technical_feeds: Vec<String>,
     pub topic_normalization: HashMap<String, String>,
     pub canonical_tokens: HashMap<String, String>,
-    pub topic_stopwords: Vec<String>,
-    pub generic_cluster_tokens: Vec<String>,
+    pub topic_stopwords: HashSet<String>,
+    pub generic_cluster_tokens: HashSet<String>,
     pub editorial_buckets: Vec<EditorialBucket>,
     pub priority_keywords_80: Vec<String>,
     pub priority_keywords_60: Vec<String>,

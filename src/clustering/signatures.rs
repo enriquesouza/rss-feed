@@ -59,12 +59,9 @@ pub fn canonical_topic_token(token: &str) -> Option<String> {
 }
 
 pub fn is_topic_stopword(token: &str) -> bool {
-    CURATION_CONFIG.topic_stopwords.iter().any(|s| s == token)
+    CURATION_CONFIG.topic_stopwords.contains(token)
 }
 
 pub fn is_generic_cluster_token(token: &str) -> bool {
-    CURATION_CONFIG
-        .generic_cluster_tokens
-        .iter()
-        .any(|s| s == token)
+    CURATION_CONFIG.generic_cluster_tokens.contains(token)
 }
