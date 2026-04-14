@@ -1,4 +1,3 @@
-use crate::curation::signals::{is_low_signal_item, is_technical_or_security};
 use crate::curation::sources::is_high_volume_general_source;
 use crate::models::configs::config::CURATION_CONFIG;
 use crate::models::rss::channel_row::ChannelRow;
@@ -14,7 +13,12 @@ pub fn news_priority_score(item: &ChannelRow) -> i32 {
 
     let mut score = 0i32;
 
-    if is_technical_or_security(item) {
+    let is_tech = CURATION_CONFIG
+        .technical_or_security_keywords
+        .iter()
+        .any(|needle| haystack.contains(needle));
+
+    if is_tech {
         score += 150;
     }
 
@@ -38,7 +42,13 @@ pub fn news_priority_score(item: &ChannelRow) -> i32 {
         score -= 20;
     }
 
-    if is_low_signal_item(item) {
+    let title_lower = item.title.to_lowercase();
+    let is_low = CURATION_CONFIG
+        .low_signal_keywords
+        .iter()
+        .any(|needle| title_lower.contains(needle));
+
+    if is_low {
         score -= 120;
     }
 

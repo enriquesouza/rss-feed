@@ -9,24 +9,17 @@ const TARGET_TECHNICAL_ITEMS: usize = 40;
 const MAX_ITEMS_FOR_LLM: usize = 80;
 
 pub fn curate_news_for_llm(news: &[ChannelRow]) -> Vec<ChannelRow> {
-    let mut technical = news
+    let (mut technical, mut general): (Vec<&ChannelRow>, Vec<&ChannelRow>) = news
         .iter()
-        .filter(|item| is_technical_or_security(item))
-        .cloned()
-        .collect::<Vec<_>>();
-    let mut general = news
-        .iter()
-        .filter(|item| !is_technical_or_security(item))
-        .cloned()
-        .collect::<Vec<_>>();
+        .partition(|&item| is_technical_or_security(item));
 
-    technical.sort_by_cached_key(|item| std::cmp::Reverse(news_priority_score(item)));
-    general.sort_by_cached_key(|item| std::cmp::Reverse(news_priority_score(item)));
+    technical.sort_by_cached_key(|&item| std::cmp::Reverse(news_priority_score(item)));
+    general.sort_by_cached_key(|&item| std::cmp::Reverse(news_priority_score(item)));
 
-    let mut selected = Vec::new();
-    let mut per_source: BTreeMap<String, usize> = BTreeMap::new();
+    let mut selected: Vec<&ChannelRow> = Vec::new();
+    let mut per_source: BTreeMap<&str, usize> = BTreeMap::new();
     let mut seen_titles: HashSet<String> = HashSet::new();
-    let mut seen_links: HashSet<String> = HashSet::new();
+    let mut seen_links: HashSet<&str> = HashSet::new();
 
     collect_ranked_news(
         &technical,
@@ -46,22 +39,23 @@ pub fn curate_news_for_llm(news: &[ChannelRow]) -> Vec<ChannelRow> {
         remaining_slots,
     );
 
-    selected.sort_by_cached_key(|item| std::cmp::Reverse(news_priority_score(item)));
+    selected.sort_by_cached_key(|&item| std::cmp::Reverse(news_priority_score(item)));
     selected.truncate(MAX_ITEMS_FOR_LLM);
-    selected
+
+    selected.into_iter().cloned().collect()
 }
 
-fn collect_ranked_news(
-    candidates: &[ChannelRow],
-    selected: &mut Vec<ChannelRow>,
-    per_source: &mut BTreeMap<String, usize>,
+fn collect_ranked_news<'a>(
+    candidates: &[&'a ChannelRow],
+    selected: &mut Vec<&'a ChannelRow>,
+    per_source: &mut BTreeMap<&'a str, usize>,
     seen_titles: &mut HashSet<String>,
-    seen_links: &mut HashSet<String>,
+    seen_links: &mut HashSet<&'a str>,
     limit: usize,
 ) {
     let mut added = 0usize;
 
-    for item in candidates {
+    for &item in candidates {
         if added >= limit {
             break;
         }
@@ -75,17 +69,17 @@ fn collect_ranked_news(
             continue;
         }
 
-        if !item.link.is_empty() && !seen_links.insert(item.link.clone()) {
+        if !item.link.is_empty() && !seen_links.insert(item.link.as_str()) {
             continue;
         }
 
-        let source_count = per_source.entry(item.source.clone()).or_default();
+        let source_count = per_source.entry(item.source.as_str()).or_default();
         if *source_count >= source_cap(item) {
             continue;
         }
 
         *source_count += 1;
-        selected.push(item.clone());
+        selected.push(item);
         added += 1;
     }
 }

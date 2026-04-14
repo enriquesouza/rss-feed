@@ -1,6 +1,6 @@
 use crate::clustering::buckets::{infer_editorial_bucket, infer_topic_tags, topic_bucket_cap};
 use crate::clustering::overlap::{has_specific_signature_overlap, same_story, signature_overlap};
-use crate::clustering::scoring::compare_topic_cluster_priority;
+use crate::clustering::scoring::topic_cluster_priority;
 use crate::clustering::signatures::topic_signature;
 use crate::curation::priority::news_priority_score;
 use crate::models::rss::channel_row::ChannelRow;
@@ -41,7 +41,7 @@ pub fn cluster_news_for_llm(news: &[ChannelRow]) -> Vec<TopicCluster> {
             .sort_by_cached_key(|item| std::cmp::Reverse(news_priority_score(item)));
     }
 
-    clusters.sort_by(compare_topic_cluster_priority);
+    clusters.sort_by_cached_key(|cluster| std::cmp::Reverse(topic_cluster_priority(cluster)));
 
     let mut selected = Vec::new();
     let mut per_bucket: BTreeMap<String, usize> = BTreeMap::new();

@@ -1,20 +1,9 @@
 use crate::curation::priority::news_priority_score;
-use crate::formatters::text::parse_feed_datetime;
 use crate::models::configs::config::CURATION_CONFIG;
 use crate::models::topic_cluster::TopicCluster;
-use chrono::DateTime;
 use std::collections::BTreeSet;
 
-pub fn compare_topic_cluster_priority(
-    left: &TopicCluster,
-    right: &TopicCluster,
-) -> std::cmp::Ordering {
-    topic_cluster_priority(right)
-        .cmp(&topic_cluster_priority(left))
-        .then_with(|| newest_cluster_datetime(right).cmp(&newest_cluster_datetime(left)))
-}
-
-fn topic_cluster_priority(cluster: &TopicCluster) -> i32 {
+pub fn topic_cluster_priority(cluster: &TopicCluster) -> i32 {
     let best_item_score = cluster
         .items
         .iter()
@@ -31,14 +20,6 @@ fn topic_cluster_priority(cluster: &TopicCluster) -> i32 {
         .unwrap_or(0);
 
     best_item_score + repetition_bonus + source_bonus + bucket_bonus
-}
-
-fn newest_cluster_datetime(cluster: &TopicCluster) -> Option<DateTime<chrono::FixedOffset>> {
-    cluster
-        .items
-        .iter()
-        .filter_map(|item| parse_feed_datetime(&item.pub_date))
-        .max()
 }
 
 pub fn distinct_source_count(cluster: &TopicCluster) -> usize {
