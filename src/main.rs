@@ -2,61 +2,61 @@ use dotenvy::dotenv;
 use std::error::Error;
 use tokio::time::{Duration, sleep};
 
-pub mod clustering;
-pub mod curation;
-pub mod formatters;
-pub mod models;
-pub mod rss;
-pub mod services;
-pub mod telegram;
+pub mod app_data;
+pub mod fetching_rss;
+pub mod formatting_text;
+pub mod grouping_news;
+pub mod picking_news;
+pub mod sending_to_telegram;
+pub mod writing_news;
 
-use crate::clustering::engine::cluster_news_for_llm;
-use crate::clustering::formatter::format_topic_cluster_for_llm;
-use crate::curation::engine::curate_news_for_llm;
-use crate::models::rss::channel_row::ChannelRow;
-use crate::models::telegram::telegram_response::TelegramResponse;
-use crate::rss::fetch::get_rss_news;
-use crate::services::open_router_service::OpenRouterService;
-use crate::telegram::sender::send_via_telegram2;
+use crate::app_data::rss_news::news_item::NewsItem;
+use crate::app_data::telegram::telegram_response::TelegramResponse;
+use crate::fetching_rss::fetch_rss_news::fetch_rss_news;
+use crate::grouping_news::format_group_for_ai::format_group_for_ai;
+use crate::grouping_news::group_related_news::group_related_news;
+use crate::picking_news::pick_news_for_ai::pick_news_for_ai;
+use crate::sending_to_telegram::send_to_telegram::send_to_telegram;
+use crate::writing_news::write_news_with_ai::NewsWriter;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().ok();
 
     let client: reqwest::Client = reqwest::Client::new();
-    let open_router_service: OpenRouterService = OpenRouterService::new(&client);
+    let writer: NewsWriter = NewsWriter::new(&client);
 
     loop {
-        let news: Result<Vec<ChannelRow>, Box<dyn Error>> = get_rss_news(&client).await;
+        let news_result: Result<Vec<NewsItem>, Box<dyn Error>> = fetch_rss_news(&client).await;
 
-        match news {
-            Ok(news) if news.is_empty() => {}
-            Ok(news) => {
-                let curated_news = curate_news_for_llm(&news);
+        match news_result {
+            Ok(news_list) if news_list.is_empty() => {}
+            Ok(news_list) => {
+                let picked_news = pick_news_for_ai(&news_list);
 
-                let topic_clusters = cluster_news_for_llm(&curated_news);
+                let news_groups = group_related_news(&picked_news);
 
-                let news_to_string = topic_clusters
+                let group_texts = news_groups
                     .iter()
-                    .map(format_topic_cluster_for_llm)
+                    .map(format_group_for_ai)
                     .collect::<Vec<_>>();
 
-                let optimized_news = open_router_service
-                    .get_optimized_news(news_to_string)
+                let message = writer
+                    .write_news_message(group_texts)
                     .await?
                     .unwrap_or_default();
 
-                let char_vec: Vec<char> = optimized_news.chars().collect();
-                let chunks: Vec<String> = char_vec
+                let letters: Vec<char> = message.chars().collect();
+                let parts: Vec<String> = letters
                     .chunks(4096)
-                    .map(|chunk| chunk.iter().collect())
+                    .map(|part| part.iter().collect())
                     .collect();
 
-                for chunk in chunks.into_iter() {
-                    let news_sent_to_telegram: Result<TelegramResponse, Box<dyn Error>> =
-                        send_via_telegram2(&client, chunk).await;
+                for part in parts {
+                    let send_result: Result<TelegramResponse, Box<dyn Error>> =
+                        send_to_telegram(&client, part).await;
 
-                    let _ = news_sent_to_telegram;
+                    let _ = send_result;
                 }
             }
             Err(_) => {}

@@ -1,2 +1,2 @@
-pub mod models;
-pub mod services;
+pub mod app_data;
+pub mod writing_news;
