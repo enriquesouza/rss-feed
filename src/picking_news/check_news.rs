@@ -4,11 +4,9 @@ use crate::app_data::settings::app_env::NEWS_RULES;
 pub fn is_tech_or_security(item: &NewsItem) -> bool {
     let search_text = format!(
         "{} {} {} {}",
-        item.source,
-        item.title.to_lowercase(),
-        item.link.to_lowercase(),
-        item.clean_description.to_lowercase()
-    );
+        item.source, item.title, item.link, item.clean_description
+    )
+    .to_lowercase();
 
     NEWS_RULES
         .technical_or_security_keywords

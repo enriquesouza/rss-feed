@@ -5,11 +5,9 @@ use crate::grouping_news::find_topic_words::is_common_word;
 pub fn find_group_name(item: &NewsItem) -> String {
     let search_text = format!(
         "{} {} {} {}",
-        item.source,
-        item.title.to_lowercase(),
-        item.link.to_lowercase(),
-        item.clean_description.to_lowercase()
-    );
+        item.source, item.title, item.link, item.clean_description
+    )
+    .to_lowercase();
 
     for group in &NEWS_RULES.topic_groups {
         if group.keywords.iter().any(|word| search_text.contains(word)) {

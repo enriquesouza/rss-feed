@@ -7,12 +7,12 @@ pub fn find_topic_words(item: &NewsItem) -> Vec<String> {
 
     for word in clean_text.split_whitespace() {
         if let Some(word) = base_word(word) {
-            if is_ignored_word(&word) {
+            if is_ignored_word(word) {
                 continue;
             }
 
-            if !words.iter().any(|existing| existing == &word) {
-                words.push(word);
+            if !words.iter().any(|existing| existing == word) {
+                words.push(word.to_string());
             }
         }
     }
@@ -44,7 +44,7 @@ fn clean_words_text(input: &str) -> String {
         .collect()
 }
 
-fn base_word(word: &str) -> Option<String> {
+fn base_word(word: &str) -> Option<&str> {
     let standard = NEWS_RULES
         .word_aliases
         .get(word)
@@ -55,7 +55,7 @@ fn base_word(word: &str) -> Option<String> {
         return None;
     }
 
-    Some(standard.to_string())
+    Some(standard)
 }
 
 fn is_ignored_word(token: &str) -> bool {

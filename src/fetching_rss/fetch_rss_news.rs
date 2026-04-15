@@ -52,16 +52,23 @@ async fn fetch_one_rss_feed(
     let source = get_source_name(feed_url);
     let keep_days = days_to_keep_for_feed(feed_url);
 
-    let feed_bytes = client
+    let response = client
         .get(feed_url)
         .timeout(Duration::from_secs(FEED_TIMEOUT_SECS))
         .send()
         .await?
-        .bytes()
-        .await?;
+        .error_for_status()?;
 
+    let content_length = response.content_length().unwrap_or(0);
+    if content_length > 10 * 1024 * 1024 {
+        return Err(format!("Feed is too large: {}", feed_url).into());
+    }
+
+    let feed_bytes = response.bytes().await?;
+    if feed_bytes.len() > 10 * 1024 * 1024 {
+        return Err(format!("Feed is too large: {}", feed_url).into());
+    }
     let feed = parser::parse(Cursor::new(feed_bytes.as_ref()))?;
-
     let today = Local::now().date_naive();
     let start_day = today - chrono::Duration::days(keep_days - 1);
 
@@ -88,12 +95,29 @@ async fn fetch_one_rss_feed(
             Some(NewsItem {
                 source: source.clone(),
                 title,
-                link: entry
-                    .links
-                    .into_iter()
-                    .find(|link| link.rel.as_deref() != Some("self"))
-                    .map(|link| link.href)
-                    .unwrap_or_default(),
+                link: {
+                    let mut best_link = String::new();
+                    let mut fallback_link = String::new();
+
+                    for link in entry.links {
+                        if link.rel.as_deref() == Some("alternate") {
+                            best_link = link.href;
+                            break;
+                        }
+                        if best_link.is_empty() && link.rel.as_deref() != Some("self") {
+                            best_link = link.href.clone();
+                        }
+                        if fallback_link.is_empty() {
+                            fallback_link = link.href.clone();
+                        }
+                    }
+
+                    if !best_link.is_empty() {
+                        best_link
+                    } else {
+                        fallback_link
+                    }
+                },
                 description,
                 clean_description,
                 published_at: date.to_rfc3339(),

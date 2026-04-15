@@ -5,11 +5,9 @@ use crate::picking_news::check_source_type::is_high_volume_source;
 pub fn score_news(item: &NewsItem) -> i32 {
     let search_text = format!(
         "{} {} {} {}",
-        item.source,
-        item.title.to_lowercase(),
-        item.link.to_lowercase(),
-        item.clean_description.to_lowercase()
-    );
+        item.source, item.title, item.link, item.clean_description
+    )
+    .to_lowercase();
 
     let mut score = 0i32;
 

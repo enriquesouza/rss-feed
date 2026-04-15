@@ -1,4 +1,5 @@
 use html2text::from_read;
+use itertools::Itertools;
 
 pub fn clean_html_text(input: &str) -> String {
     let safe_html = ammonia::clean(input);
@@ -11,6 +12,5 @@ pub fn clean_html_text(input: &str) -> String {
     text.lines()
         .map(str::trim)
         .filter(|line| !line.is_empty())
-        .collect::<Vec<_>>()
         .join(" ")
 }

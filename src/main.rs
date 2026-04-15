@@ -1,3 +1,8 @@
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
+
 use dotenvy::dotenv;
 use std::error::Error;
 use std::time::Duration as StdDuration;

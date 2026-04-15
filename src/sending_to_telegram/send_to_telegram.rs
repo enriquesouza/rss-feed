@@ -20,6 +20,10 @@ pub async fn send_to_telegram(
         let telegram_message = TelegramMessage {
             chat_id: env.telegram_chat_id.clone(),
             text: message_text,
+            parse_mode: None,
+            link_preview_options: None,
+            disable_notification: None,
+            protect_content: None,
         };
 
         let http_response = client
@@ -32,7 +36,28 @@ pub async fn send_to_telegram(
             .send()
             .await?;
 
+        let status = http_response.status();
         telegram_response = http_response.json().await?;
+
+        if !status.is_success() || !telegram_response.ok {
+            if let Some(params) = &telegram_response.parameters {
+                if let Some(retry) = params.retry_after {
+                    eprintln!("Telegram asked to retry after {} seconds", retry);
+                }
+                if let Some(chat_id) = params.migrate_to_chat_id {
+                    eprintln!("Telegram group migrated to chat_id: {}", chat_id);
+                }
+            }
+            return Err(format!(
+                "Telegram API error. Status: {}, Description: {}",
+                status,
+                telegram_response
+                    .description
+                    .as_deref()
+                    .unwrap_or("unknown")
+            )
+            .into());
+        }
     }
 
     Ok(telegram_response)
