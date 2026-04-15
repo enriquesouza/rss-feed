@@ -1,6 +1,6 @@
 use crate::app_data::rss_news::news_item::NewsItem;
 use crate::app_data::settings::app_env::NEWS_RULES;
-use crate::picking_news::limit_news_per_source::is_high_volume_source;
+use crate::picking_news::check_source_type::is_high_volume_source;
 
 pub fn score_news(item: &NewsItem) -> i32 {
     let search_text = format!(

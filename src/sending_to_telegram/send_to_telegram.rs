@@ -3,6 +3,9 @@ use crate::app_data::telegram::telegram_message::TelegramMessage;
 use crate::app_data::telegram::telegram_response::TelegramResponse;
 use crate::sending_to_telegram::format_text_for_telegram::format_text_for_telegram;
 use std::error::Error;
+use std::time::Duration;
+
+const TELEGRAM_TIMEOUT_SECS: u64 = 15;
 
 pub async fn send_to_telegram(
     client: &reqwest::Client,
@@ -24,6 +27,7 @@ pub async fn send_to_telegram(
                 "https://api.telegram.org/bot{}/sendMessage",
                 env.telegram_bot_token
             ))
+            .timeout(Duration::from_secs(TELEGRAM_TIMEOUT_SECS))
             .json(&telegram_message)
             .send()
             .await?;

@@ -3,26 +3,33 @@ use crate::app_data::settings::app_env::NEWS_RULES;
 use crate::fetching_rss::days_to_keep_for_feed::days_to_keep_for_feed;
 use crate::formatting_text::clean_html::clean_html_text;
 use crate::formatting_text::clean_text::{get_source_name, parse_feed_date};
-use ::futures::future::join_all;
+use ::futures::stream::{self, StreamExt};
 use chrono::Local;
 use feed_rs::parser;
 use std::error::Error;
 use std::io::Cursor;
+use std::time::Duration;
+
+const MAX_FEEDS_AT_ONCE: usize = 10;
+const FEED_TIMEOUT_SECS: u64 = 20;
 
 pub async fn fetch_rss_news(client: &reqwest::Client) -> Result<Vec<NewsItem>, Box<dyn Error>> {
     let feed_list = &NEWS_RULES.rss_feeds;
 
-    let feed_jobs = join_all(
-        feed_list
-            .iter()
-            .map(|feed_url| async move { (feed_url, fetch_one_rss_feed(client, feed_url).await) }),
-    )
-    .await;
+    let feed_jobs = stream::iter(feed_list.iter().cloned())
+        .map(|feed_url| {
+            let client = client.clone();
+
+            async move { fetch_one_rss_feed(&client, &feed_url).await }
+        })
+        .buffer_unordered(MAX_FEEDS_AT_ONCE)
+        .collect::<Vec<_>>()
+        .await;
 
     let mut items: Vec<NewsItem> = vec![];
     let mut good_feeds = 0usize;
 
-    for (_, feed_items) in feed_jobs {
+    for feed_items in feed_jobs {
         if let Ok(feed_items) = feed_items {
             good_feeds += 1;
             items.extend(feed_items);
@@ -33,8 +40,7 @@ pub async fn fetch_rss_news(client: &reqwest::Client) -> Result<Vec<NewsItem>, B
         return Err("all RSS providers failed".into());
     }
 
-    items.sort_by_key(|item: &NewsItem| parse_feed_date(&item.published_at));
-    items.reverse();
+    items.sort_by_cached_key(|item| std::cmp::Reverse(parse_feed_date(&item.published_at)));
 
     Ok(items)
 }
@@ -46,7 +52,13 @@ async fn fetch_one_rss_feed(
     let source = get_source_name(feed_url);
     let keep_days = days_to_keep_for_feed(feed_url);
 
-    let feed_bytes = client.get(feed_url).send().await?.bytes().await?;
+    let feed_bytes = client
+        .get(feed_url)
+        .timeout(Duration::from_secs(FEED_TIMEOUT_SECS))
+        .send()
+        .await?
+        .bytes()
+        .await?;
 
     let feed = parser::parse(Cursor::new(feed_bytes.as_ref()))?;
 

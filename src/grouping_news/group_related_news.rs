@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 
 const MAX_GROUPS: usize = 18;
 
-pub fn group_related_news(news: &[NewsItem]) -> Vec<NewsGroup> {
+pub fn make_all_news_groups(news: &[NewsItem]) -> Vec<NewsGroup> {
     let mut sorted_items = news.to_vec();
     sorted_items.sort_by_cached_key(|item| std::cmp::Reverse(score_news(item)));
 
@@ -46,6 +46,12 @@ pub fn group_related_news(news: &[NewsItem]) -> Vec<NewsGroup> {
     }
 
     news_groups.sort_by_cached_key(|group| std::cmp::Reverse(score_news_group(group)));
+
+    news_groups
+}
+
+pub fn group_related_news(news: &[NewsItem]) -> Vec<NewsGroup> {
+    let news_groups = make_all_news_groups(news);
 
     let mut selected = Vec::new();
     let mut group_counts: BTreeMap<String, usize> = BTreeMap::new();

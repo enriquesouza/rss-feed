@@ -5,8 +5,12 @@ use crate::app_data::{
 };
 use reqwest::Client;
 use serde::Deserialize;
-use serde_yml;
-use std::{fs::read_to_string, path::Path};
+use std::sync::LazyLock;
+use std::{fs::read_to_string, path::Path, time::Duration};
+
+const OPEN_ROUTER_TIMEOUT_SECS: u64 = 120;
+const OPEN_ROUTER_RETRY_WAIT_SECS: u64 = 2;
+
 pub struct NewsWriter<'a> {
     client: &'a Client,
 }
@@ -15,6 +19,18 @@ pub struct PromptFile {
     #[serde(rename = "system_prompt")]
     prompt: String,
 }
+
+pub static NEWS_MESSAGE_PROMPT: LazyLock<PromptFile> = LazyLock::new(|| {
+    let file_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("prompts")
+        .join("news_message.yml");
+
+    let file_text =
+        read_to_string(&file_path).unwrap_or_else(|_| panic!("Could not read {:?}", file_path));
+
+    serde_norway::from_str(&file_text).expect("Failed to parse news_message.yml")
+});
 
 impl<'a> NewsWriter<'a> {
     pub fn new(client: &'a reqwest::Client) -> Self {
@@ -25,14 +41,6 @@ impl<'a> NewsWriter<'a> {
         &self,
         news_blocks: Vec<String>,
     ) -> anyhow::Result<Option<String>> {
-        let file_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("src")
-            .join("prompts")
-            .join("news_message.yml");
-
-        let file_text = read_to_string(&file_path)?;
-        let prompt: PromptFile = serde_yml::from_str(&file_text)?;
-
         let news_text = news_blocks.join("\n\n---\n\n");
 
         let body = ChatRequest {
@@ -40,7 +48,7 @@ impl<'a> NewsWriter<'a> {
             messages: vec![
                 ChatMessage {
                     role: "system".to_string(),
-                    content: prompt.prompt,
+                    content: NEWS_MESSAGE_PROMPT.prompt.clone(),
                     tool_calls: None,
                     tool_call_id: None,
                 },
@@ -82,6 +90,7 @@ impl<'a> NewsWriter<'a> {
                 let http_response = self
                     .client
                     .post("https://openrouter.ai/api/v1/chat/completions")
+                    .timeout(Duration::from_secs(OPEN_ROUTER_TIMEOUT_SECS))
                     .header("Authorization", format!("Bearer {}", api_key))
                     .header("Content-Type", "application/json")
                     .header("HTTP-Referer", "https://compra.ai")
@@ -99,20 +108,15 @@ impl<'a> NewsWriter<'a> {
                 Ok(response)
             };
 
-            match tokio::time::timeout(std::time::Duration::from_secs(120), job).await {
-                Ok(Ok(response)) => return Ok(response),
-                Ok(Err(err)) => {
+            match job.await {
+                Ok(response) => return Ok(response),
+                Err(err) => {
                     last_problem = Some(err);
-                }
-                Err(_) => {
-                    let timeout_error = anyhow::anyhow!("OpenRouter API timeout after 120s");
-
-                    last_problem = Some(timeout_error);
                 }
             }
 
             if attempt < 3 {
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                tokio::time::sleep(Duration::from_secs(OPEN_ROUTER_RETRY_WAIT_SECS)).await;
             }
         }
 

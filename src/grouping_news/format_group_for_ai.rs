@@ -3,7 +3,8 @@ use crate::grouping_news::score_news_group::count_unique_sources;
 const MAX_ARTICLES_PER_GROUP: usize = 6;
 
 pub fn format_group_for_ai(group: &NewsGroup) -> String {
-    let repeat = match group.items.len() {
+    let unique_sources = count_unique_sources(group);
+    let repeat = match unique_sources {
         0 | 1 => "single_source",
         2 | 3 => "repeated",
         _ => "very_repeated",
@@ -35,7 +36,7 @@ pub fn format_group_for_ai(group: &NewsGroup) -> String {
         group.group_name,
         repeat,
         group.items.len(),
-        count_unique_sources(group),
+        unique_sources,
         group.topic_words.join(", "),
         group.tags.join(", "),
         sample_titles,
