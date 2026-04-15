@@ -1,4 +1,6 @@
 use crate::app_data::open_router::ChatMessage;
+use crate::app_data::open_router::ProviderPreferences;
+use crate::app_data::open_router::chat_message::MessageContent;
 use crate::app_data::{
     open_router::{ChatCompletionResponse, ChatRequest, UsageConfig},
     settings::app_env::AppEnv,
@@ -37,34 +39,55 @@ impl<'a> NewsWriter<'a> {
         Self { client }
     }
 
-    pub async fn write_news_message(
-        &self,
-        news_blocks: Vec<String>,
-    ) -> anyhow::Result<Option<String>> {
-        let news_text = news_blocks.join("\n\n---\n\n");
-
+    pub async fn write_news_message(&self, news_text: String) -> anyhow::Result<Option<String>> {
         let body = ChatRequest {
             model: "x-ai/grok-4.1-fast".into(),
             messages: vec![
                 ChatMessage {
                     role: "system".to_string(),
-                    content: NEWS_MESSAGE_PROMPT.prompt.clone(),
+                    content: Some(MessageContent::Text(NEWS_MESSAGE_PROMPT.prompt.clone())),
+                    name: None,
                     tool_calls: None,
                     tool_call_id: None,
                 },
                 ChatMessage {
                     role: "user".to_string(),
-                    content: news_text,
+                    content: Some(MessageContent::Text(news_text)),
+                    name: None,
                     tool_calls: None,
                     tool_call_id: None,
                 },
             ],
             stream: false,
-            temperature: Some(0.9),
+            temperature: Some(0.3),
             max_tokens: Some(4000),
+            max_completion_tokens: None,
             usage: Some(UsageConfig { include: true }),
             stream_options: None,
             tools: None,
+            models: None,
+            provider: Some(ProviderPreferences {
+                data_collection: Some("deny".to_string()),
+                ..Default::default()
+            }),
+            response_format: None,
+            stop: None,
+            tool_choice: None,
+            parallel_tool_calls: None,
+            plugins: None,
+            reasoning: Some(serde_json::json!({
+                "effort": "high"
+            })),
+            user: None,
+            route: None,
+            top_p: None,
+            top_k: None,
+            frequency_penalty: None,
+            presence_penalty: None,
+            repetition_penalty: None,
+            min_p: None,
+            top_a: None,
+            seed: None,
         };
 
         let response = self.send_chat_request(body).await?;
@@ -72,7 +95,7 @@ impl<'a> NewsWriter<'a> {
         let message_text = response
             .choices
             .first()
-            .map(|item| item.message.content.clone())
+            .and_then(|item| item.message.text_content())
             .unwrap_or_default();
 
         Ok(Some(message_text))
@@ -94,7 +117,7 @@ impl<'a> NewsWriter<'a> {
                     .header("Authorization", format!("Bearer {}", api_key))
                     .header("Content-Type", "application/json")
                     .header("HTTP-Referer", "https://compra.ai")
-                    .header("X-Title", "compra.ai")
+                    .header("X-OpenRouter-Title", "compra.ai")
                     .json(&request)
                     .send()
                     .await?;

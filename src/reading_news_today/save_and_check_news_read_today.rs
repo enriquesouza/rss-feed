@@ -14,20 +14,37 @@ pub struct NewsReadTodayDb {
 
 impl NewsReadTodayDb {
     pub fn open_news_read_today_db() -> anyhow::Result<Self> {
-        let today_folder_name = today_folder_name();
         let db_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join(".local_db")
-            .join("news_read_today")
-            .join(&today_folder_name);
+            .join("news_read_v2");
 
         if let Some(parent_path) = db_path.parent() {
             fs::create_dir_all(parent_path).context("Could not create local db folder")?;
-            clear_old_day_folders(parent_path, &today_folder_name)?;
         }
 
-        let db = sled::open(&db_path).context("Could not open local news-read-today db")?;
+        let db = sled::open(&db_path).context("Could not open local news-read db")?;
 
-        Ok(Self { db })
+        let instance = Self { db };
+        let _ = instance.cleanup_old_news();
+
+        Ok(instance)
+    }
+
+    fn cleanup_old_news(&self) -> anyhow::Result<()> {
+        let cutoff_time = Local::now().timestamp() - (7 * 24 * 60 * 60);
+        for entry in self.db.iter() {
+            if let Ok((key, value)) = entry {
+                if value.len() == 8 {
+                    let mut bytes = [0u8; 8];
+                    bytes.copy_from_slice(&value);
+                    let timestamp = i64::from_be_bytes(bytes);
+                    if timestamp < cutoff_time {
+                        let _ = self.db.remove(key);
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn filter_out_news_already_read_today(
@@ -54,17 +71,18 @@ impl NewsReadTodayDb {
     }
 
     pub fn save_news_read_today(&self, news: &[NewsItem]) -> anyhow::Result<()> {
+        let now_bytes = Local::now().timestamp().to_be_bytes();
         for item in news {
             for key in news_read_today_keys(item) {
                 self.db
-                    .insert(key.as_bytes(), &[1])
-                    .with_context(|| format!("Could not save news-read-today key: {key}"))?;
+                    .insert(key.as_bytes(), &now_bytes)
+                    .with_context(|| format!("Could not save news-read key: {key}"))?;
             }
         }
 
         self.db
             .flush()
-            .context("Could not flush local news-read-today db")?;
+            .context("Could not flush local news-read db")?;
 
         Ok(())
     }
@@ -74,7 +92,7 @@ impl NewsReadTodayDb {
             if self
                 .db
                 .contains_key(key.as_bytes())
-                .with_context(|| format!("Could not check news-read-today key: {key}"))?
+                .with_context(|| format!("Could not check news-read key: {key}"))?
             {
                 return Ok(true);
             }
@@ -82,28 +100,6 @@ impl NewsReadTodayDb {
 
         Ok(false)
     }
-}
-
-fn clear_old_day_folders(
-    db_folder: &std::path::Path,
-    today_folder_name: &str,
-) -> anyhow::Result<()> {
-    for folder_entry in fs::read_dir(db_folder).context("Could not read local db folder")? {
-        let folder_entry = folder_entry.context("Could not read a local db folder entry")?;
-        let folder_path = folder_entry.path();
-        let folder_name = folder_entry.file_name().to_string_lossy().to_string();
-
-        if folder_name != today_folder_name && folder_path.is_dir() {
-            fs::remove_dir_all(&folder_path)
-                .with_context(|| format!("Could not remove old local db folder: {folder_name}"))?;
-        }
-    }
-
-    Ok(())
-}
-
-fn today_folder_name() -> String {
-    Local::now().date_naive().format("%Y-%m-%d").to_string()
 }
 
 fn news_read_today_keys(item: &NewsItem) -> Vec<String> {

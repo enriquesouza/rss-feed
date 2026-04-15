@@ -29,6 +29,10 @@ use crate::reading_stories_today::save_and_check_stories_read_today::StoriesRead
 use crate::sending_to_telegram::send_to_telegram::send_to_telegram;
 use crate::writing_news::write_news_with_ai::NewsWriter;
 
+use crate::grouping_news::score_news_group::count_unique_sources;
+
+use futures::stream::{self, StreamExt};
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().ok();
@@ -63,8 +67,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 news_read_today_db.save_news_read_today(&fresh_news)?;
 
                 let story_groups = make_all_news_groups(&fresh_news);
-                let fresh_story_groups =
-                    stories_read_today_db.filter_out_stories_already_read_today(story_groups)?;
+                let fresh_story_groups = stories_read_today_db
+                    .filter_out_stories_already_read_today(&writer, story_groups)
+                    .await?;
                 if fresh_story_groups.is_empty() {
                     sleep(Duration::from_hours(3)).await;
                     continue;
@@ -83,19 +88,47 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     continue;
                 }
 
-                let news_groups = group_related_news(&picked_news);
+                let news_groups: Vec<_> = group_related_news(&picked_news);
 
-                let group_texts = news_groups
-                    .iter()
-                    .map(format_group_for_ai)
-                    .collect::<Vec<_>>();
+                if news_groups.is_empty() {
+                    sleep(Duration::from_hours(3)).await;
+                    continue;
+                }
 
-                let message = writer
-                    .write_news_message(group_texts)
-                    .await?
-                    .unwrap_or_default();
+                let processed_messages: Vec<String> = stream::iter(news_groups.into_iter())
+                    .map(|group| {
+                        let writer_ref = &writer;
+                        async move {
+                            let unique_sources = count_unique_sources(&group);
+                            let prefix = match unique_sources {
+                                1 => "[Falado em 1 blog]".to_string(),
+                                n if n >= 4 => format!("[Muito falado +{} blogs]", n),
+                                n => format!("[Falado em {} blogs]", n),
+                            };
+                            let group_text = format_group_for_ai(&group);
+                            match writer_ref.write_news_message(group_text).await {
+                                Ok(Some(msg)) => {
+                                    let clean_msg =
+                                        msg.replace("(Muito repetida)", "").trim().to_string();
+                                    Some(format!("**{}**\n\n{}", prefix, clean_msg))
+                                }
+                                _ => None,
+                            }
+                        }
+                    })
+                    .buffer_unordered(5)
+                    .filter_map(|res| async { res })
+                    .collect()
+                    .await;
 
-                let letters: Vec<char> = message.chars().collect();
+                if processed_messages.is_empty() {
+                    sleep(Duration::from_hours(3)).await;
+                    continue;
+                }
+
+                let final_message = processed_messages.join("\n\n");
+
+                let letters: Vec<char> = final_message.chars().collect();
                 let parts: Vec<String> = letters
                     .chunks(4096)
                     .map(|part| part.iter().collect())
