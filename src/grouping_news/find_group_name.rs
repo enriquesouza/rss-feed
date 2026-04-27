@@ -1,5 +1,5 @@
 use crate::app_data::rss_news::news_item::NewsItem;
-use crate::app_data::settings::app_env::NEWS_RULES;
+use crate::app_data::settings::news_rules::NEWS_RULES;
 use crate::grouping_news::find_topic_words::is_common_word;
 
 pub fn find_group_name(item: &NewsItem) -> String {

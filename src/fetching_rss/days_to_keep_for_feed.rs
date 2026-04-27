@@ -1,4 +1,4 @@
-use crate::app_data::settings::app_env::NEWS_RULES;
+use crate::app_data::settings::news_rules::NEWS_RULES;
 
 pub fn days_to_keep_for_feed(feed_url: &str) -> i64 {
     if NEWS_RULES

@@ -1,5 +1,5 @@
 use crate::app_data::news_group::NewsGroup;
-use crate::app_data::settings::app_env::NEWS_RULES;
+use crate::app_data::settings::news_rules::NEWS_RULES;
 use crate::picking_news::score_news::score_news;
 use std::collections::BTreeSet;
 

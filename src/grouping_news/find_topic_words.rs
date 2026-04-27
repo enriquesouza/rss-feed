@@ -1,5 +1,5 @@
 use crate::app_data::rss_news::news_item::NewsItem;
-use crate::app_data::settings::app_env::NEWS_RULES;
+use crate::app_data::settings::news_rules::NEWS_RULES;
 
 pub fn find_topic_words(item: &NewsItem) -> Vec<String> {
     let clean_text = clean_words_text(&item.title);

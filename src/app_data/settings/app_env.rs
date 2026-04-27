@@ -2,15 +2,6 @@ use std::sync::OnceLock;
 
 pub static APP_ENV: OnceLock<AppEnv> = OnceLock::new();
 
-pub static NEWS_RULES: std::sync::LazyLock<super::news_rules::NewsRules> =
-    std::sync::LazyLock::new(|| {
-        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-        let path = std::path::Path::new(&manifest_dir).join("src/prompts/news_rules.yml");
-        let content =
-            std::fs::read_to_string(&path).unwrap_or_else(|_| panic!("Could not read {:?}", path));
-        serde_norway::from_str(&content).expect("Failed to parse news_rules.yml")
-    });
-
 #[derive(Clone, Default)]
 pub struct AppEnv {
     pub open_router_api_key: String,

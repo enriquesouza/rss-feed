@@ -1,4 +1,4 @@
-use crate::app_data::settings::app_env::NEWS_RULES;
+use crate::app_data::settings::news_rules::NEWS_RULES;
 
 pub fn is_high_volume_source(source: &str) -> bool {
     NEWS_RULES

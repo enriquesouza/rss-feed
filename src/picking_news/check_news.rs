@@ -1,5 +1,5 @@
 use crate::app_data::rss_news::news_item::NewsItem;
-use crate::app_data::settings::app_env::NEWS_RULES;
+use crate::app_data::settings::news_rules::NEWS_RULES;
 
 pub fn is_tech_or_security(item: &NewsItem) -> bool {
     let search_text = format!(

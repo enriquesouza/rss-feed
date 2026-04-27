@@ -1,5 +1,5 @@
 use crate::app_data::rss_news::news_item::NewsItem;
-use crate::app_data::settings::app_env::NEWS_RULES;
+use crate::app_data::settings::news_rules::NEWS_RULES;
 use crate::fetching_rss::days_to_keep_for_feed::days_to_keep_for_feed;
 use crate::formatting_text::clean_html::clean_html_text;
 use crate::formatting_text::clean_text::{get_source_name, parse_feed_date};

@@ -1,9 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Default)]
-pub struct LinkPreviewOptions {
-    pub is_disabled: Option<bool>,
-}
+use crate::app_data::telegram::link_preview_options::LinkPreviewOptions;
 
 #[derive(Serialize, Deserialize)]
 pub struct TelegramMessage {

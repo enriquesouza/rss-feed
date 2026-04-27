@@ -1,16 +1,8 @@
 use serde::Deserialize;
 
-#[derive(Deserialize, Default, Debug)]
-pub struct ResponseParameters {
-    pub retry_after: Option<u32>,
-    pub migrate_to_chat_id: Option<i64>,
-}
-
-#[derive(Deserialize, Default, Debug)]
-pub struct SentTelegramMessage {
-    pub message_id: i64,
-    pub date: i64,
-}
+use crate::app_data::telegram::{
+    response_parameters::ResponseParameters, sent_telegram_message::SentTelegramMessage,
+};
 
 #[derive(Deserialize, Default, Debug)]
 pub struct TelegramResponse {
