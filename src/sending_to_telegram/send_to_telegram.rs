@@ -20,7 +20,7 @@ pub async fn send_to_telegram(
         let telegram_message = TelegramMessage {
             chat_id: env.telegram_chat_id.clone(),
             text: message_text,
-            parse_mode: None,
+            parse_mode: Some("Markdown".to_string()),
             link_preview_options: None,
             disable_notification: None,
             protect_content: None,

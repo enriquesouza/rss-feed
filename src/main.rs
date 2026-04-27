@@ -55,11 +55,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let news_result: Result<Vec<NewsItem>, Box<dyn Error>> = fetch_rss_news(&client).await;
 
         match news_result {
-            Ok(news_list) if news_list.is_empty() => {}
+            Ok(news_list) if news_list.is_empty() => {
+                eprintln!("RSS returned no news items, sleeping 3h...");
+            }
             Ok(news_list) => {
                 let fresh_news =
                     news_read_today_db.filter_out_news_already_read_today(news_list)?;
                 if fresh_news.is_empty() {
+                    eprintln!("No fresh news after dedup, sleeping 3h...");
                     sleep(Duration::from_hours(3)).await;
                     continue;
                 }
@@ -68,9 +71,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                 let story_groups = make_all_news_groups(&fresh_news);
                 let fresh_story_groups = stories_read_today_db
-                    .filter_out_stories_already_read_today(&writer, story_groups)
+                    .filter_out_stories_already_read_today(&client, story_groups)
                     .await?;
                 if fresh_story_groups.is_empty() {
+                    eprintln!("No fresh story groups after dedup, sleeping 3h...");
                     sleep(Duration::from_hours(3)).await;
                     continue;
                 }
@@ -84,6 +88,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                 let picked_news = pick_news_for_ai(&fresh_story_news);
                 if picked_news.is_empty() {
+                    eprintln!("No news picked for AI, sleeping 3h...");
                     sleep(Duration::from_hours(3)).await;
                     continue;
                 }
@@ -91,6 +96,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 let news_groups: Vec<_> = group_related_news(&picked_news);
 
                 if news_groups.is_empty() {
+                    eprintln!("No news groups after grouping, sleeping 3h...");
                     sleep(Duration::from_hours(3)).await;
                     continue;
                 }
@@ -110,9 +116,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 Ok(Some(msg)) => {
                                     let clean_msg =
                                         msg.replace("(Muito repetida)", "").trim().to_string();
-                                    Some(format!("**{}**\n\n{}", prefix, clean_msg))
+                                    Some(format!("*{}*\n\n{}", prefix, clean_msg))
                                 }
-                                _ => None,
+                                Ok(None) => {
+                                    eprintln!("AI writer returned empty message for group: {}", prefix);
+                                    None
+                                }
+                                Err(e) => {
+                                    eprintln!("AI writer failed for group {}: {}", prefix, e);
+                                    None
+                                }
                             }
                         }
                     })
@@ -122,17 +135,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     .await;
 
                 if processed_messages.is_empty() {
+                    eprintln!("All AI writer calls failed or returned empty, sleeping 3h...");
                     sleep(Duration::from_hours(3)).await;
                     continue;
                 }
 
                 let final_message = processed_messages.join("\n\n");
 
-                let letters: Vec<char> = final_message.chars().collect();
-                let parts: Vec<String> = letters
-                    .chunks(4096)
-                    .map(|part| part.iter().collect())
-                    .collect();
+                let mut parts = Vec::new();
+                let mut start = 0;
+                while start < final_message.len() {
+                    let mut end = (start + 4096).min(final_message.len());
+                    while end > start && !final_message.is_char_boundary(end) {
+                        end -= 1;
+                    }
+                    parts.push(final_message[start..end].to_string());
+                    start = end;
+                }
 
                 for part in parts {
                     let send_result: Result<TelegramResponse, Box<dyn Error>> =
@@ -143,9 +162,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     }
                 }
             }
-            Err(_) => {}
+            Err(e) => {
+                eprintln!("RSS fetch failed: {}", e);
+            }
         }
 
+        eprintln!("Sleeping 3 hours before next fetch...");
         sleep(Duration::from_hours(3)).await;
     }
 }

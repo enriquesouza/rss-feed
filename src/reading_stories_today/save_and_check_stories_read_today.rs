@@ -1,4 +1,9 @@
-use crate::app_data::news_group::NewsGroup;
+use crate::app_data::{
+    news_group::NewsGroup,
+    ollama::{OllamaClient, NLU_MODEL},
+    open_router::ChatMessage,
+    open_router::chat_message::MessageContent,
+};
 use crate::formatting_text::clean_text::clean_title;
 use anyhow::Context;
 use chrono::Local;
@@ -44,9 +49,14 @@ impl StoriesReadTodayDb {
 
     pub async fn filter_out_stories_already_read_today<'a>(
         &self,
-        writer: &crate::writing_news::write_news_with_ai::NewsWriter<'a>,
+        client: &reqwest::Client,
         stories: Vec<NewsGroup>,
     ) -> anyhow::Result<Vec<NewsGroup>> {
+        let ollama_host = crate::app_data::settings::app_env::AppEnv::get()
+            .ollama_host
+            .clone();
+        let ollama = OllamaClient::new(client, ollama_host);
+
         let mut saved_stories = self.load_saved_stories()?;
         let mut fresh_stories = Vec::new();
 
@@ -66,7 +76,7 @@ impl StoriesReadTodayDb {
                     .collect();
 
                 if !relevant_past.is_empty() {
-                    match check_duplicate_with_ai(writer, &story_to_check, &relevant_past).await {
+                    match check_duplicate_with_ai(&ollama, &story_to_check, &relevant_past).await {
                         Ok(true) => {
                             println!("NLU deduplicated story: {:?}", story_to_check.clean_titles);
                             is_duplicate = true;
@@ -135,8 +145,8 @@ impl StoriesReadTodayDb {
     }
 }
 
-async fn check_duplicate_with_ai<'a>(
-    writer: &crate::writing_news::write_news_with_ai::NewsWriter<'a>,
+async fn check_duplicate_with_ai(
+    ollama: &OllamaClient<'_>,
     new_story: &StoryReadToday,
     past_stories: &[&StoryReadToday],
 ) -> anyhow::Result<bool> {
@@ -159,59 +169,27 @@ async fn check_duplicate_with_ai<'a>(
         past_texts, new_titles
     );
 
-    let body = crate::app_data::open_router::ChatRequest {
-        model: "openai/gpt-4o-mini".to_string(),
-        messages: vec![crate::app_data::open_router::ChatMessage {
-            role: "user".to_string(),
-            content: Some(crate::app_data::open_router::chat_message::MessageContent::Text(prompt)),
-            name: None,
-            tool_calls: None,
-            tool_call_id: None,
-        }],
-        stream: false,
-        temperature: Some(0.0),
-        max_tokens: Some(15),
-        max_completion_tokens: None,
-        usage: None,
-        stream_options: None,
-        tools: None,
-        models: Some(vec![
-            "google/gemini-2.5-flash".to_string(),
-            "anthropic/claude-3-haiku".to_string(),
-        ]),
-        provider: Some(crate::app_data::open_router::ProviderPreferences {
-            data_collection: Some("deny".to_string()),
-            ..Default::default()
-        }),
-        response_format: Some(crate::app_data::open_router::ResponseFormat {
-            format_type: "json_object".to_string(),
-            json_schema: None,
-        }),
-        stop: None,
-        tool_choice: None,
-        parallel_tool_calls: None,
-        plugins: None,
-        reasoning: None,
-        user: None,
-        route: None,
-        top_p: None,
-        top_k: None,
-        frequency_penalty: None,
-        presence_penalty: None,
-        repetition_penalty: None,
-        min_p: None,
-        top_a: None,
-        seed: None,
-    };
+    let messages = vec![ChatMessage {
+        role: "user".to_string(),
+        content: Some(MessageContent::Text(prompt)),
+        name: None,
+        tool_calls: None,
+        tool_call_id: None,
+    }];
 
-    let response = writer.send_chat_request(body).await?;
+    // Use low temperature for deterministic NLU, small max_tokens for speed
+    let response = ollama
+        .chat_completion(NLU_MODEL, messages, 0.0, 300, Some("low"))
+        .await?;
+
     let content = response
         .choices
         .first()
         .and_then(|item| item.message.text_content())
         .unwrap_or_default();
 
-    let result: NluResponse = serde_json::from_str(&content)?;
+    let result: NluResponse = serde_json::from_str(&content)
+        .map_err(|e| anyhow::anyhow!("Failed to parse NLU response '{}': {}", content, e))?;
     Ok(result.duplicate)
 }
 
