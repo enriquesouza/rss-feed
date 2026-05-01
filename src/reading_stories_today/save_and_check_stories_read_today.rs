@@ -1,6 +1,6 @@
 use crate::app_data::{
     news_group::NewsGroup,
-    ollama::{OllamaClient, NLU_MODEL},
+    ollama::{NLU_MODEL, OllamaClient},
     open_router::ChatMessage,
     open_router::chat_message::MessageContent,
 };
@@ -177,9 +177,9 @@ async fn check_duplicate_with_ai(
         tool_call_id: None,
     }];
 
-    // Use low temperature for deterministic NLU, small max_tokens for speed
+    // Use low temperature for deterministic NLU, larger max_tokens so thinking doesn't get cut off
     let response = ollama
-        .chat_completion(NLU_MODEL, messages, 0.0, 300, Some("low"))
+        .chat_completion(NLU_MODEL, messages, 0.0, 1000, Some("low"))
         .await?;
 
     let content = response
@@ -187,6 +187,8 @@ async fn check_duplicate_with_ai(
         .first()
         .and_then(|item| item.message.text_content())
         .unwrap_or_default();
+
+    println!("{}", &content);
 
     let result: NluResponse = serde_json::from_str(&content)
         .map_err(|e| anyhow::anyhow!("Failed to parse NLU response '{}': {}", content, e))?;

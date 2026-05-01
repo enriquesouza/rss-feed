@@ -1,4 +1,4 @@
-use crate::app_data::open_router::{ChatMessage, ChatCompletionResponse};
+use crate::app_data::open_router::{ChatCompletionResponse, ChatMessage};
 use reqwest::Client;
 use serde_json::Value;
 
@@ -40,6 +40,8 @@ impl<'a> OllamaClient<'a> {
                 "messages": messages,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
+                "stream":false,
+                "think": true
             });
 
             if let Some(effort) = reasoning_effort {
@@ -50,7 +52,7 @@ impl<'a> OllamaClient<'a> {
                 .http_client
                 .post(format!("{}{}", self.base_url, BASE_PATH))
                 .json(&body)
-                .timeout(std::time::Duration::from_secs(60))
+                .timeout(std::time::Duration::from_secs(60*10))
                 .send()
                 .await
                 .map_err(|e| anyhow::anyhow!("Failed to send request: {}", e))?;

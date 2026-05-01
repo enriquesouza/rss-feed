@@ -58,7 +58,7 @@ impl<'a> NewsWriter<'a> {
 
         let response = self
             .ollama
-            .chat_completion(NEWS_WRITER_MODEL, messages, 0.3, 4000, Some("high"))
+            .chat_completion(NEWS_WRITER_MODEL, messages, 0.3, 4000, Some("max"))
             .await?;
 
         let message_text = response

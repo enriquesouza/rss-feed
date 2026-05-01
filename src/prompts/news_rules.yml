@@ -72,6 +72,10 @@ slow_feeds:
   - "blog.cloudflare.com/tag/rust"
   - "blog.neodyme.io"
 
+# ATENÇÃO: Estas substituições são case-sensitive.
+# "world liberty financial" NÃO substitui "World Liberty Financial" com maiúsculas.
+# Se precisar de case-insensitive, normalize o texto antes ou adicione variantes.
+
 word_replacements:
   "world liberty financial": "wlfi"
   "microstrategy": "strategy"
@@ -248,6 +252,8 @@ topic_groups:
     keywords: ["ai agent", "carbium", "venice", "bittensor", "tao ", "zkml", "tee", "autonomous", "inference"]
     max_count: 3
     priority_bonus: 25
+    # Catch-all para notícias que não se encaixam em nenhum tópico específico acima
+
   - id: "general-market"
     keywords: []
     max_count: 2
@@ -296,6 +302,11 @@ priority_keywords_60:
   - "phishing"
   - "seed phrase"
   - "private key"
+
+# Nota: esta lista compartilha termos com priority_keywords_80 intencionalmente.
+# technical_or_security_keywords controla a classificação de "fonte técnica"
+# priority_keywords_80 controla pontuação de relevância
+# São propósitos diferentes, então a duplicação é deliberada.
 
 technical_or_security_keywords:
   - "blog.rust-lang.org"

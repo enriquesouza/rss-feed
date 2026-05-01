@@ -1,3 +1,15 @@
+> ⚠️ **Contexto deste projeto**
+> 
+> Este é um app de linha de comando escrito em Rust que coleta RSS feeds, agrupa notícias e envia resumos para o Telegram via um LLM.
+> Ele roda em um loop agendado (a cada N minutos/horas) e não é um sistema de alta frequência, um servidor web com milhões de requests, nem um motor de trading.
+> 
+> **Antes de aplicar qualquer regra deste arquivo, pergunte-se:**
+> - Esta otimização realmente importa para um app que passa 90% do tempo esperando HTTP responses e LLM calls?
+> - Esta mudança torna o código mais complexo sem benefício mensurável?
+> - Eu medi (profilei) antes de decidir otimizar?
+> 
+> Prefira soluções simples, legíveis e manuteníveis. Micro-otimizações só valem a pena se você tiver dados de profiling que mostrem um gargalo real.
+
 # Rust Performance Skills
 
 These skills should be applied by performance specialist agents. They incorporate elite, systems-level, and hardcore performance engineering principles.
