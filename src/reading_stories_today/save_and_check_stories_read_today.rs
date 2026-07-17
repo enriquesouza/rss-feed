@@ -47,7 +47,7 @@ impl StoriesReadTodayDb {
         Ok(Self { db })
     }
 
-    pub async fn filter_out_stories_already_read_today<'a>(
+    pub async fn filter_out_stories_already_read_today(
         &self,
         client: &reqwest::Client,
         stories: Vec<NewsGroup>,

@@ -32,15 +32,13 @@ impl NewsReadTodayDb {
 
     fn cleanup_old_news(&self) -> anyhow::Result<()> {
         let cutoff_time = Local::now().timestamp() - (7 * 24 * 60 * 60);
-        for entry in self.db.iter() {
-            if let Ok((key, value)) = entry {
-                if value.len() == 8 {
-                    let mut bytes = [0u8; 8];
-                    bytes.copy_from_slice(&value);
-                    let timestamp = i64::from_be_bytes(bytes);
-                    if timestamp < cutoff_time {
-                        let _ = self.db.remove(key);
-                    }
+        for (key, value) in self.db.iter().flatten() {
+            if value.len() == 8 {
+                let mut bytes = [0u8; 8];
+                bytes.copy_from_slice(&value);
+                let timestamp = i64::from_be_bytes(bytes);
+                if timestamp < cutoff_time {
+                    let _ = self.db.remove(key);
                 }
             }
         }

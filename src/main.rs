@@ -4,6 +4,7 @@ use mimalloc::MiMalloc;
 static GLOBAL: MiMalloc = MiMalloc;
 
 use dotenvy::dotenv;
+use std::collections::HashSet;
 use std::error::Error;
 use std::time::Duration as StdDuration;
 use tokio::time::{Duration, sleep};
@@ -18,18 +19,19 @@ pub mod reading_stories_today;
 pub mod sending_to_telegram;
 pub mod writing_news;
 
+use crate::app_data::news_group::NewsGroup;
 use crate::app_data::rss_news::news_item::NewsItem;
+use crate::app_data::settings::news_rules::NEWS_RULES;
 use crate::app_data::telegram::telegram_response::TelegramResponse;
 use crate::fetching_rss::fetch_rss_news::fetch_rss_news;
 use crate::grouping_news::format_group_for_ai::format_group_for_ai;
 use crate::grouping_news::group_related_news::{group_related_news, make_all_news_groups};
+use crate::grouping_news::score_news_group::score_news_group;
 use crate::picking_news::pick_news_for_ai::pick_news_for_ai;
 use crate::reading_news_today::save_and_check_news_read_today::NewsReadTodayDb;
 use crate::reading_stories_today::save_and_check_stories_read_today::StoriesReadTodayDb;
 use crate::sending_to_telegram::send_to_telegram::send_to_telegram;
 use crate::writing_news::write_news_with_ai::NewsWriter;
-
-use crate::grouping_news::score_news_group::count_unique_sources;
 
 use futures::stream::{self, StreamExt};
 
@@ -56,7 +58,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         match news_result {
             Ok(news_list) if news_list.is_empty() => {
-                eprintln!("RSS returned no news items, sleeping 3h...");
+                // Falls through to the shared sleep block at bottom of the loop — no redundant message.
             }
             Ok(news_list) => {
                 let fresh_news =
@@ -101,47 +103,107 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     continue;
                 }
 
-                let processed_messages: Vec<String> = stream::iter(news_groups.into_iter())
-                    .map(|group| {
-                        let writer_ref = &writer;
-                        async move {
-                            let unique_sources = count_unique_sources(&group);
-                            let prefix = match unique_sources {
-                                1 => "[Falado em 1 blog]".to_string(),
-                                n if n >= 4 => format!("[Muito falado +{} blogs]", n),
-                                n => format!("[Falado em {} blogs]", n),
-                            };
-                            let group_text = format_group_for_ai(&group);
-                            match writer_ref.write_news_message(group_text).await {
-                                Ok(Some(msg)) => {
-                                    let clean_msg =
-                                        msg.replace("(Muito repetida)", "").trim().to_string();
-                                    Some(format!("*{}*\n\n{}", prefix, clean_msg))
-                                }
-                                Ok(None) => {
-                                    eprintln!("AI writer returned empty message for group: {}", prefix);
-                                    None
-                                }
-                                Err(e) => {
-                                    eprintln!("AI writer failed for group {}: {}", prefix, e);
-                                    None
+                // ---- Score every group up-front so ordering is deterministic by priority. ----
+                let scored_groups: Vec<(i32, NewsGroup)> = news_groups
+                    .into_iter()
+                    .map(|group| (score_news_group(&group), group))
+                    .collect();
+
+                struct GroupMeta {
+                    topic_label: String,
+                    source_domains: Vec<String>,
+                }
+
+                let mut processed_entries: Vec<(i32, GroupMeta, String)> =
+                    stream::iter(scored_groups.into_iter())
+                        .map(|(score, group)| {
+                            let writer_ref = &writer;
+                            async move {
+                                let topic_label = topic_label_for(&group.group_name);
+                                let source_domains = extract_source_domains(&group.items);
+                                let meta = GroupMeta {
+                                    topic_label,
+                                    source_domains,
+                                };
+                                let group_text = format_group_for_ai(&group);
+                                match writer_ref.write_news_message(group_text).await {
+                                    Ok(Some(msg)) => {
+                                        let clean_msg =
+                                            msg.replace("(Muito repetida)", "").trim().to_string();
+                                        Some((score, meta, clean_msg))
+                                    }
+                                    Ok(None) => None,
+                                    Err(e) => {
+                                        eprintln!(
+                                            "AI writer failed for group {}: {}",
+                                            group.group_name, e
+                                        );
+                                        None
+                                    }
                                 }
                             }
-                        }
-                    })
-                    .buffer_unordered(5)
-                    .filter_map(|res| async { res })
-                    .collect()
-                    .await;
+                        })
+                        .buffer_unordered(5)
+                        .filter_map(|res| async move { res })
+                        .collect()
+                        .await;
 
-                if processed_messages.is_empty() {
+                if processed_entries.is_empty() {
                     eprintln!("All AI writer calls failed or returned empty, sleeping 3h...");
                     sleep(Duration::from_hours(3)).await;
                     continue;
                 }
 
-                let final_message = processed_messages.join("\n\n");
+                // Sort entries by priority score desc so the reader always sees the most important
+                // categories first — regardless of which async task finished last.
+                processed_entries.sort_by_key(|e| std::cmp::Reverse(e.0));
 
+                // Partition: non-empty topic-label entries first (still desc by score),
+                // then general-market / unknown-topic fallbacks at the very end.
+                // ---- Partition entries by topic label presence (still in desc-score order). ----
+                let total_count = processed_entries.len();
+
+                let mut non_empty = Vec::new();
+                let mut empty_topic = Vec::new();
+                for entry in processed_entries.into_iter() {
+                    if entry.1.topic_label.is_empty() {
+                        empty_topic.push(entry);
+                    } else {
+                        non_empty.push(entry);
+                    }
+                }
+
+                // ---- Build the final Telegram message. ----
+                let unique_topics: HashSet<String> =
+                    non_empty.iter().map(|e| e.1.topic_label.clone()).collect();
+
+                let mut final_message = String::new();
+                final_message.push_str(&format!(
+                    "🗞 *Resumo de hoje* — {} notícias em {} categorias\n",
+                    total_count,
+                    unique_topics.len(),
+                ));
+                final_message.push('\n');
+
+                for (_score, meta, ai_text) in non_empty.into_iter().chain(empty_topic.into_iter())
+                {
+                    if !meta.topic_label.is_empty() {
+                        final_message.push_str(&format!("\n{}\n", meta.topic_label));
+                    } else {
+                        final_message.push('\n');
+                    }
+                    final_message.push('\n');
+                    final_message.push_str(&ai_text);
+
+                    if !meta.source_domains.is_empty() {
+                        let links: Vec<&str> =
+                            meta.source_domains.iter().map(|s| s.as_str()).collect();
+                        final_message.push_str(&format!("\n\n🔗 {}", links.join(" · ")));
+                    }
+                    final_message.push('\n');
+                }
+
+                // ---- Telegram split (unchanged from original). ----
                 let mut parts = Vec::new();
                 let mut start = 0;
                 while start < final_message.len() {
@@ -170,4 +232,72 @@ async fn main() -> Result<(), Box<dyn Error>> {
         eprintln!("Sleeping 3 hours before next fetch...");
         sleep(Duration::from_hours(3)).await;
     }
+}
+
+/// Return a display-friendly, emoji-prefixed topic label for the given group name.
+/// Falls back to an empty string when no mapping is found (general-market / unknown).
+fn topic_label_for(group_name: &str) -> String {
+    let raw = match NEWS_RULES
+        .topic_groups
+        .iter()
+        .find(|r| r.group_name == group_name)
+    {
+        Some(r) => match r.group_name.as_str() {
+            "rust-rustsec" => Some("⚙️ *Rust/Solidity*"),
+            "smart-contract-security" => Some("🛡️ *Smart Contract Security*"),
+            "hacks-exploits" => Some("🔴 *Hacks & Exploits*"),
+            "stablecoins-payments" => Some("💵 *Stablecoins & Payments*"),
+            "regulation-market-structure" => Some("📜 *Regulation*"),
+            "btc-corporate" => Some("₿ *Corporate Treasury*"),
+            "ethereum-evm" => Some("Ξ *Ethereum & EVM*"),
+            "solana-infra" => Some("◎ *Solana Infra*"),
+            "macro-geopolitics" => Some("🌐 *Macro & Geopolitics*"),
+            "ai-agents-security" => Some("🤖 *AI Agents & Security*"),
+            _ => None, // general-market or any unrecognized group → empty string
+        },
+        None => return String::new(),
+    };
+    raw.map(String::from).unwrap_or_default()
+}
+
+/// Extract unique source hostnames (in insertion order) from a slice of news items.
+/// No external crates — simple scheme/hostname parsing against `item.source`.
+fn extract_source_domains(items: &[NewsItem]) -> Vec<String> {
+    let mut seen = HashSet::<String>::new();
+    let mut domains = Vec::new();
+
+    for item in items {
+        // Strip `scheme://` if present, then take up to the next `/` or whole string.
+        let host_part: &str = match (item.source.find("://"), item.source.find('/')) {
+            (Some(scheme_end), Some(next_slash)) if scheme_end + 3 < next_slash => {
+                &item.source[scheme_end + 3..]
+            }
+            _ => item.source.as_str(),
+        };
+
+        // Take the hostname portion.
+        let hostname: &str = match host_part.find('/') {
+            Some(idx) => &host_part[..idx],
+            None => host_part,
+        };
+
+        // Strip a trailing port segment if present (e.g. `:443`).
+        let hostname: String = match hostname.rfind(':') {
+            Some(port_start)
+                if hostname[port_start + 1..]
+                    .chars()
+                    .all(|c| c.is_ascii_digit()) =>
+            {
+                hostname[..port_start].to_string()
+            }
+            _ => hostname.to_string(),
+        };
+
+        let host = hostname.trim();
+        if !host.is_empty() && seen.insert(host.to_string()) {
+            domains.push(host.to_string());
+        }
+    }
+
+    domains
 }

@@ -24,6 +24,7 @@ pub fn pick_news_for_ai(news: &[NewsItem]) -> Vec<NewsItem> {
         &mut seen_titles,
         &mut seen_links,
         TARGET_TECH_ITEMS,
+        false,
     );
     let open_slots = MAX_ITEMS.saturating_sub(picked_items.len());
     add_best_items(
@@ -32,6 +33,7 @@ pub fn pick_news_for_ai(news: &[NewsItem]) -> Vec<NewsItem> {
         &mut seen_titles,
         &mut seen_links,
         open_slots,
+        true,
     );
 
     picked_items.sort_by_cached_key(|&item| std::cmp::Reverse(score_news(item)));
@@ -46,6 +48,7 @@ fn add_best_items<'a>(
     seen_titles: &mut HashSet<String>,
     seen_links: &mut HashSet<&'a str>,
     limit: usize,
+    skip_low_quality: bool,
 ) {
     let mut added = 0usize;
 
@@ -54,7 +57,7 @@ fn add_best_items<'a>(
             break;
         }
 
-        if is_low_quality(item) && !is_tech_or_security(item) {
+        if skip_low_quality && is_low_quality(item) {
             continue;
         }
 

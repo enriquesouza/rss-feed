@@ -29,11 +29,9 @@ pub async fn fetch_rss_news(client: &reqwest::Client) -> Result<Vec<NewsItem>, B
     let mut items: Vec<NewsItem> = vec![];
     let mut good_feeds = 0usize;
 
-    for feed_items in feed_jobs {
-        if let Ok(feed_items) = feed_items {
-            good_feeds += 1;
-            items.extend(feed_items);
-        }
+    for feed_items in feed_jobs.into_iter().flatten() {
+        good_feeds += 1;
+        items.extend(feed_items);
     }
 
     if good_feeds == 0 {

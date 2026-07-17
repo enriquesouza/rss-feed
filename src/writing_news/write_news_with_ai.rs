@@ -1,5 +1,5 @@
 use crate::app_data::{
-    ollama::{OllamaClient, NEWS_WRITER_MODEL},
+    ollama::{NEWS_WRITER_MODEL, OllamaClient},
     open_router::ChatMessage,
     open_router::chat_message::MessageContent,
     settings::app_env::AppEnv,
@@ -67,6 +67,10 @@ impl<'a> NewsWriter<'a> {
             .and_then(|item| item.message.text_content())
             .unwrap_or_default();
 
-        Ok(Some(message_text))
+        if message_text.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(message_text))
+        }
     }
 }

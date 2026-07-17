@@ -48,14 +48,23 @@ impl<'a> OllamaClient<'a> {
                 body["reasoning_effort"] = Value::String(effort.to_string());
             }
 
-            let response = self
+            let response = match self
                 .http_client
                 .post(format!("{}{}", self.base_url, BASE_PATH))
                 .json(&body)
-                .timeout(std::time::Duration::from_secs(60*10))
+                .timeout(std::time::Duration::from_secs(60 * 10))
                 .send()
                 .await
-                .map_err(|e| anyhow::anyhow!("Failed to send request: {}", e))?;
+            {
+                Ok(response) => response,
+                Err(e) => {
+                    if attempt == MAX_RETRIES - 1 {
+                        anyhow::bail!("Failed to send request: {}", e);
+                    }
+                    tokio::time::sleep(tokio::time::Duration::from_secs(BACKOFF_SECONDS)).await;
+                    continue;
+                }
+            };
 
             if response.status().is_success() {
                 let result: ChatCompletionResponse = response
