@@ -1,6 +1,6 @@
 use crate::app_data::{
     news_group::NewsGroup,
-    ollama::{NLU_MODEL, OllamaClient},
+    omlx::{NLU_MODEL, OmlxClient},
     open_router::ChatMessage,
     open_router::chat_message::MessageContent,
 };
@@ -52,10 +52,12 @@ impl StoriesReadTodayDb {
         client: &reqwest::Client,
         stories: Vec<NewsGroup>,
     ) -> anyhow::Result<Vec<NewsGroup>> {
-        let ollama_host = crate::app_data::settings::app_env::AppEnv::get()
-            .ollama_host
-            .clone();
-        let ollama = OllamaClient::new(client, ollama_host);
+        let app_env = crate::app_data::settings::app_env::AppEnv::get();
+        let omlx = OmlxClient::new(
+            client,
+            app_env.omlx_host.clone(),
+            app_env.omlx_api_key.clone(),
+        );
 
         let mut saved_stories = self.load_saved_stories()?;
         let mut fresh_stories = Vec::new();
@@ -76,7 +78,7 @@ impl StoriesReadTodayDb {
                     .collect();
 
                 if !relevant_past.is_empty() {
-                    match check_duplicate_with_ai(&ollama, &story_to_check, &relevant_past).await {
+                    match check_duplicate_with_ai(&omlx, &story_to_check, &relevant_past).await {
                         Ok(true) => {
                             println!("NLU deduplicated story: {:?}", story_to_check.clean_titles);
                             is_duplicate = true;
@@ -146,7 +148,7 @@ impl StoriesReadTodayDb {
 }
 
 async fn check_duplicate_with_ai(
-    ollama: &OllamaClient<'_>,
+    omlx: &OmlxClient<'_>,
     new_story: &StoryReadToday,
     past_stories: &[&StoryReadToday],
 ) -> anyhow::Result<bool> {
@@ -178,7 +180,7 @@ async fn check_duplicate_with_ai(
     }];
 
     // Use low temperature for deterministic NLU, larger max_tokens so thinking doesn't get cut off
-    let response = ollama
+    let response = omlx
         .chat_completion(NLU_MODEL, messages, 0.0, 1000, Some("low"))
         .await?;
 

@@ -46,6 +46,18 @@ rss_providers:
   - "https://rustsec.org/feed.xml"
   - "https://blog.cloudflare.com/tag/rust/rss/"
   - "https://blog.neodyme.io/rss.xml"
+  # AI labs and AI tooling (tested live in 2026-08; Anthropic/Meta/Mistral have no RSS —
+  # their releases arrive via Simon Willison, Hugging Face and LocalLLaMA)
+  - "https://openai.com/news/rss.xml"
+  - "https://huggingface.co/blog/feed.xml"
+  - "https://qwenlm.github.io/blog/index.xml"
+  - "https://ollama.com/blog/rss.xml"
+  - "https://deepmind.google/blog/rss.xml"
+  - "https://simonwillison.net/atom/everything/"
+  - "https://blog.google/technology/ai/rss/"
+  - "https://blogs.nvidia.com/feed/"
+  - "https://www.reddit.com/r/localllama/.rss"
+  - "https://importai.substack.com/feed"
 
 slow_feeds:
   - "blog.ethereum.org"
@@ -71,6 +83,11 @@ slow_feeds:
   - "rustsec.org"
   - "blog.cloudflare.com/tag/rust"
   - "blog.neodyme.io"
+  - "deepmind.google"
+  - "blog.google"
+  - "blogs.nvidia.com"
+  - "reddit.com/r/localllama"
+  - "importai.substack.com"
 
 # ATENÇÃO: Estas substituições são case-sensitive.
 # "world liberty financial" NÃO substitui "World Liberty Financial" com maiúsculas.
@@ -212,12 +229,22 @@ common_words:
   - "guidance"
 
 topic_groups:
+  - id: "ai-models"
+    keywords: ["qwen", "kimi", "moonshot", "claude", "anthropic", "openai", "chatgpt", "gpt", "deepseek", "glm", "llama", "mistral", "open weights", "open-weight", "ollama", "local model", "ai"]
+    # "gemini" stays weak: Gemini is also a crypto exchange, so the name alone cannot decide.
+    weak_keywords: ["llm", "inference", "benchmark", "quantization", "fine-tune", "gemini"]
+    # sources: only topically pure feeds — a listed source classifies the item on its own
+    sources: ["reddit.com/r/localllama", "deepmind.google", "qwenlm.github.io", "huggingface.co", "ollama.com", "openai.com", "importai.substack.com", "blog.google/technology/ai"]
+    max_count: 4
+    priority_bonus: 50
   - id: "rust-rustsec"
     keywords: ["rustsec", "rust", "tokio", "wasmtime", "crates.io"]
+    sources: ["this-week-in-rust.org", "blog.rust-lang.org", "rustsec.org", "tokio.rs", "blog.cloudflare.com/tag/rust"]
     max_count: 3
     priority_bonus: 40
   - id: "smart-contract-security"
     keywords: ["openzeppelin", "solidity", "smart contract", "smart-contract", "trailofbits", "trail of bits", "audit", "mutation testing", "mewt", "muton"]
+    sources: ["blog.trailofbits.com", "blog.openzeppelin.com", "forum.openzeppelin.com", "forum.soliditylang.org", "osec.io"]
     max_count: 3
     priority_bonus: 40
   - id: "hacks-exploits"
@@ -229,7 +256,7 @@ topic_groups:
     max_count: 3
     priority_bonus: 25
   - id: "regulation-market-structure"
-    keywords: ["sec ", "commission", "mica", "esma", "fca", "clarity act", "compliance", "lawmaker", "legislation"]
+    keywords: ["sec", "commission", "mica", "esma", "fca", "clarity act", "compliance", "lawmaker", "legislation"]
     max_count: 3
     priority_bonus: 20
   - id: "btc-corporate"
@@ -245,11 +272,11 @@ topic_groups:
     max_count: 3
     priority_bonus: 40
   - id: "macro-geopolitics"
-    keywords: ["fomc", "interest rate", "powell", "fed ", "inflation", "cpi", "election", "geopolitics"]
+    keywords: ["fomc", "interest rate", "powell", "fed", "inflation", "cpi", "election", "geopolitics"]
     max_count: 3
     priority_bonus: 20
   - id: "ai-agents-security"
-    keywords: ["ai agent", "carbium", "venice", "bittensor", "tao ", "zkml", "tee", "autonomous", "inference"]
+    keywords: ["ai agent", "carbium", "venice", "bittensor", "tao", "zkml", "tee", "autonomous"]
     max_count: 3
     priority_bonus: 25
     # Catch-all para notícias que não se encaixam em nenhum tópico específico acima
@@ -260,6 +287,21 @@ topic_groups:
     priority_bonus: 0
 
 priority_keywords_80:
+  - "qwen"
+  - "kimi"
+  - "moonshot"
+  - "claude"
+  - "anthropic"
+  - "openai"
+  - "deepseek"
+  - "glm"
+  - "gemini"
+  - "llm"
+  - "open weights"
+  - "open-weight"
+  - "local model"
+  - "ollama"
+  - "ai agent"
   - "rust"
   - "rustsec"
   - "tokio"

@@ -2,23 +2,25 @@ use crate::app_data::open_router::{ChatCompletionResponse, ChatMessage};
 use reqwest::Client;
 use serde_json::Value;
 
-/// Ollama client for local/cloud LLM interactions via OpenAI-compatible API
+/// oMLX client (Apple MLX server) via OpenAI-compatible API
 #[derive(Clone, Debug)]
-pub struct OllamaClient<'a> {
+pub struct OmlxClient<'a> {
     http_client: &'a Client,
     base_url: String,
+    api_key: Option<String>,
 }
 
-impl<'a> OllamaClient<'a> {
-    /// Create a new Ollama client
-    pub fn new(http_client: &'a Client, base_url: String) -> Self {
+impl<'a> OmlxClient<'a> {
+    /// Create a new oMLX client
+    pub fn new(http_client: &'a Client, base_url: String, api_key: Option<String>) -> Self {
         Self {
             http_client,
             base_url,
+            api_key,
         }
     }
 
-    /// Send a chat completion request to Ollama
+    /// Send a chat completion request to oMLX
     ///
     /// `reasoning_effort` is optional and passed as-is to the API (e.g. "low", "high", "none").
     /// Supported by reasoning-capable models like DeepSeek-V4.
@@ -48,9 +50,13 @@ impl<'a> OllamaClient<'a> {
                 body["reasoning_effort"] = Value::String(effort.to_string());
             }
 
-            let response = match self
+            let mut request = self
                 .http_client
-                .post(format!("{}{}", self.base_url, BASE_PATH))
+                .post(format!("{}{}", self.base_url, BASE_PATH));
+            if let Some(key) = &self.api_key {
+                request = request.bearer_auth(key);
+            }
+            let response = match request
                 .json(&body)
                 .timeout(std::time::Duration::from_secs(60 * 10))
                 .send()

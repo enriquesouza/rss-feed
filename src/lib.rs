@@ -1,2 +1,10 @@
 pub mod app_data;
+pub mod checking_stories;
+pub mod fetching_rss;
+pub mod fetching_x_metrics;
+pub mod formatting_text;
+pub mod grouping_news;
+pub mod picking_news;
+pub mod storing_posts;
 pub mod writing_news;
+pub mod writing_x_posts;

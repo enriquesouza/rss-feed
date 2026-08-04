@@ -1,6 +1,48 @@
 # rss-feed
 
-This file explains why each dependency is in `Cargo.toml`, where it is used, what we know about its performance and security, and which crates do similar work.
+Personal news engine: fetches RSS feeds every 3 hours, groups related items into stories, writes a PT-BR digest with a local AI model (oMLX), sends it to Telegram, and drafts English X posts once a day. A web admin ("mesa de publicação") manages the post lifecycle and reads the news portal.
+
+## Quick start
+
+```
+make start
+```
+
+That builds and starts everything:
+
+- **admin** — the web UI at <http://localhost:8787> (Axum + HTMX)
+- **worker** — the pipeline loop (fetch → group → AI digest → Telegram, every 3h)
+- **SQLite** — embedded (`.local_db/posts.sqlite`), no server to start
+
+Other commands:
+
+| Command | What it does |
+| --- | --- |
+| `make stop` | stop admin + worker |
+| `make status` | what is running + admin health check |
+| `make logs` | follow both logs (`/tmp/rss-feed-admin.log`, `/tmp/rss-feed-worker.log`) |
+| `make coletar` | one fetch round now — fills the news portal, no AI, no Telegram |
+| `make resumos` | same, but also writes the AI digest of each story |
+| `make admin` / `make worker` | start only one of them |
+| `make test` | fmt + check + clippy + full test suite |
+
+### Requirements
+
+- Rust (edition 2024) and `make`
+- A `.env` file in the repo root (loaded path-anchored, so binaries work from any cwd):
+
+```
+OMLX_HOST=http://localhost:8000
+OMLX_API_KEY=...          # from ~/.omlx/settings.json → auth.api_key
+TELEGRAM_BOT_TOKEN=...    # worker only — admin runs without these
+TELEGRAM_CHAT_ID=...
+```
+
+- The oMLX server running with `Ternary-Bonsai-27B-mlx-2bit` (the single model used for every AI task — the pipeline never asks for a second model)
+
+## Dependency review
+
+This section explains why each dependency is in `Cargo.toml`, where it is used, what we know about its performance and security, and which crates do similar work.
 
 Important:
 

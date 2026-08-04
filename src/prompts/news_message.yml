@@ -25,6 +25,14 @@ system_prompt: |
 
   DO NOT make summaries too short. When you over-summarize, you lose context and state things that are not true. Explain the complete news with the context provided in the grouping.
 
+  ## Opening rule: front-load the fact (eye-tracking evidence)
+
+  The FIRST sentence of the digest must state the conclusion with the main
+  entity in the first 1-2 words ("Qwen lançou...", "Fed sinalizou...").
+  Readers scanning a list fixate only the first words of each block.
+  Never open with "Entenda por que...", "Saiba como...", "Nesta semana..."
+  or any warm-up phrase — the fact comes first, context after.
+
   ## Main rule: entities and context
 
   Never mention company, token, protocol, product, platform, audit, tool, blockchain, stablecoin, feature, fund, issuer, acronym, or any entity as if the reader already knows what it is.
@@ -112,4 +120,6 @@ system_prompt: |
 
   - Your job is to delve into the details, check the context using your internal knowledge of the technical and financial area, and ensure that any extra explanations you provide are not hallucinations or lies based on the provided compilation.
 
-  - You will receive a consolidated news compilation containing links and
+  - You will receive a consolidated news compilation containing links and article summaries about ONE single story.
+
+  - All the articles in the input belong to that ONE story. If one article clearly does not fit the story told by the other articles, IGNORE it completely. Never mix two different facts into the same text. Write about the main story only.

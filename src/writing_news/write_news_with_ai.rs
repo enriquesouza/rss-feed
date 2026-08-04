@@ -1,5 +1,5 @@
 use crate::app_data::{
-    ollama::{NEWS_WRITER_MODEL, OllamaClient},
+    omlx::{NEWS_WRITER_MODEL, OmlxClient},
     open_router::ChatMessage,
     open_router::chat_message::MessageContent,
     settings::app_env::AppEnv,
@@ -15,7 +15,7 @@ pub struct PromptFile {
 }
 
 pub struct NewsWriter<'a> {
-    ollama: OllamaClient<'a>,
+    omlx: OmlxClient<'a>,
 }
 
 pub static NEWS_MESSAGE_PROMPT: LazyLock<PromptFile> = LazyLock::new(|| {
@@ -32,9 +32,10 @@ pub static NEWS_MESSAGE_PROMPT: LazyLock<PromptFile> = LazyLock::new(|| {
 
 impl<'a> NewsWriter<'a> {
     pub fn new(client: &'a reqwest::Client) -> Self {
-        let base_url = AppEnv::get().ollama_host.clone();
+        let base_url = AppEnv::get().omlx_host.clone();
+        let api_key = AppEnv::get().omlx_api_key.clone();
         Self {
-            ollama: OllamaClient::new(client, base_url),
+            omlx: OmlxClient::new(client, base_url, api_key),
         }
     }
 
@@ -57,7 +58,7 @@ impl<'a> NewsWriter<'a> {
         ];
 
         let response = self
-            .ollama
+            .omlx
             .chat_completion(NEWS_WRITER_MODEL, messages, 0.3, 4000, Some("max"))
             .await?;
 
